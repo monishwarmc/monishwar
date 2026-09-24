@@ -1,0 +1,24 @@
+"use client";
+
+import {
+  useMonishwar,
+  animations,
+  ActionName,
+} from "@/app/contexts/MonishwarContext";
+import { Leva, useControls } from "leva";
+
+export default function UIcontrols() {
+  const { animation, setAnimation } = useMonishwar();
+
+  useControls("Controls", {
+    animation: {
+      value: animation,
+      options: animations,
+      onChange: (val: ActionName) => {
+        setAnimation(val);
+      },
+    },
+  });
+
+  return <Leva />;
+}
