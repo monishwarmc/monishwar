@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { GLTF } from "three-stdlib";
-import { ActionName } from "../contexts/MonishwarContext";
+import { ActionName } from "../components/contexts/MonishwarContext";
 
 interface GLTFAction extends THREE.AnimationClip {
   name: ActionName;

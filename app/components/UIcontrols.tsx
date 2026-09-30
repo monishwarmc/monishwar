@@ -4,7 +4,7 @@ import {
   useMonishwar,
   animations,
   ActionName,
-} from "@/app/contexts/MonishwarContext";
+} from "@/app/components/contexts/MonishwarContext";
 import { Leva, useControls } from "leva";
 
 export default function UIcontrols() {

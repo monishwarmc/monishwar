@@ -26,11 +26,6 @@ export const createIdle = () => {
     );
   };
 
-  // -------------------------
-  // BODY
-  // -------------------------
-
-  // Slow chest breathing
   const Spine2 = createRotationTrack(
     "Spine2",
     new THREE.Vector3(1, 0, 0),
@@ -38,7 +33,6 @@ export const createIdle = () => {
     [0, 2, 4, 6, 8, 10, 12],
   );
 
-  // Slightly different breathing rhythm
   const Spine1 = createRotationTrack(
     "Spine1",
     new THREE.Vector3(1, 0, 0),
@@ -46,7 +40,6 @@ export const createIdle = () => {
     [0, 2.3, 4.6, 6.9, 9.2, 11.5, 12],
   );
 
-  // Very subtle weight shift
   const Hips = createRotationTrack(
     "Hips",
     new THREE.Vector3(0, 1, 0),
@@ -54,7 +47,6 @@ export const createIdle = () => {
     [0, 3, 6, 9, 12],
   );
 
-  // Slow neck movement
   const Neck = createRotationTrack(
     "Neck",
     new THREE.Vector3(0, 1, 0),
@@ -62,7 +54,6 @@ export const createIdle = () => {
     [0, 4, 8, 12],
   );
 
-  // Very small head movement
   const Head = createRotationTrack(
     "Head",
     new THREE.Vector3(0, 1, 0),

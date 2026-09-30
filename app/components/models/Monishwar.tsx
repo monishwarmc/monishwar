@@ -5,8 +5,8 @@ import { useGLTF, useAnimations } from "@react-three/drei";
 import { SkeletonUtils } from "three-stdlib";
 import { useMonishwar } from "../contexts/MonishwarContext";
 import { Sofa } from "./Sofa";
-import { GLTFResult } from "../types/GLTFresult";
-import { createIdle } from "./Animations";
+import { GLTFResult } from "../../types/GLTFresult";
+import { createIdle } from "../animations/Animations";
 
 const configureActionProps = (
   action: THREE.AnimationAction,
@@ -138,7 +138,7 @@ export function Monishwar({ animationSpeedRef, ...props }: MonishwarProps) {
     action.play();
 
     if (previousAction && previousAction !== action) {
-      action.crossFadeFrom(previousAction, 0.25, false);
+      action.crossFadeFrom(previousAction, 0.3, false);
     } else {
       action.fadeIn(0.25);
     }

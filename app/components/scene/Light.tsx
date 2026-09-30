@@ -1,14 +1,12 @@
-export default function Light() {
+import React from "react";
+
+const Light = () => {
   return (
     <>
-      <ambientLight intensity={1} />
-      <directionalLight
-        position={[5, 5, 5]}
-        intensity={2}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
-      />
-      <directionalLight position={[-5, 5, 5]} intensity={2} />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[0, 0, 5]} />
     </>
   );
-}
+};
+
+export default Light;
