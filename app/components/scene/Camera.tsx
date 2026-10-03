@@ -1,41 +1,45 @@
-import { useData } from "../contexts/Data";
-import { useEffect } from "react";
-import { useMonishwar } from "../contexts/MonishwarContext";
-import * as THREE from "three";
+"use client";
+
 import { CameraControls } from "@react-three/drei";
+import { useEffect } from "react";
+import { useSession } from "../contexts/SessionContext";
+import FollowCamera from "./FollowCamera";
 
-const Camera = () => {
-  const { camRef, zoom } = useData();
-  const { ref } = useMonishwar();
+/** Framing for the idle showcase: far enough out to see the whole ship. */
+const IDLE_VIEW = [3, 1, 4, 0, 0, 0] as const;
 
+const OrbitShowcase = () => {
+  const { camRef } = useSession();
+
+  // The default camera carries no position of its own, so the rig that is
+  // mounted decides the framing. Doing it here keeps the idle view identical
+  // on first load and on every return from explore mode.
   useEffect(() => {
-    if (!camRef?.current || !ref?.current || !zoom) return;
+    camRef.current?.setLookAt(...IDLE_VIEW, false);
+  }, [camRef]);
 
-    // Get exact target center position inside the spaceship
-    const targetPos = new THREE.Vector3();
-    ref.current.getWorldPosition(targetPos);
+  return (
+    <CameraControls
+      ref={camRef}
+      maxDistance={20}
+      minDistance={0.5}
+      maxPolarAngle={Math.PI * 0.85}
+      zoom={true}
+    />
+  );
+};
 
-    // Look at point: centered slightly above character base inside cockpit
-    targetPos.y += 0.05;
+/**
+ * Two camera modes, mutually exclusive.
+ *
+ * Idle: `CameraControls` lets visitors orbit the floating spaceship.
+ * Explore: the orbit rig is unmounted so `FollowCamera` owns the camera
+ * outright — leaving both mounted would make them fight over its transform.
+ */
+const Camera = () => {
+  const { exploring } = useSession();
 
-    // Camera offset: scaled down to fit inside the 0.07 scaled glass dome
-    const cameraPos = targetPos
-      .clone()
-      .add(new THREE.Vector3(0.08, 0.04, 0.12));
-
-    // Smooth transition inside cockpit
-    camRef.current.setLookAt(
-      cameraPos.x,
-      cameraPos.y,
-      cameraPos.z,
-      targetPos.x,
-      targetPos.y,
-      targetPos.z,
-      true,
-    );
-  }, [zoom, camRef, ref]);
-
-  return <CameraControls ref={camRef} maxDistance={20} minDistance={0} />;
+  return exploring ? <FollowCamera /> : <OrbitShowcase />;
 };
 
 export default Camera;

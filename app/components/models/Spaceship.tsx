@@ -8,7 +8,7 @@ import { useGLTF } from "@react-three/drei";
 import { GLTF } from "three-stdlib";
 import { ThreeElements } from "@react-three/fiber";
 import { useMemo } from "react";
-import { useData } from "../contexts/Data";
+import { useSession } from "../contexts/SessionContext";
 
 type GLTFResult = GLTF & {
   nodes: {
@@ -47,7 +47,7 @@ export function Spaceship(props: ThreeElements["group"]) {
     return mat;
   }, [materials.Material]);
 
-  const { spaceshipRef } = useData();
+  const { spaceshipRef } = useSession();
 
   return (
     <group {...props} dispose={null} ref={spaceshipRef} scale={0.07}>

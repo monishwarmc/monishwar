@@ -1,19 +1,17 @@
-import FullScreen from "./components/UI/FullScreen";
+import KeyboardProvider from "./components/controls/KeyboardProvider";
 import Experience from "./components/scene/Experience";
-import UIcontrols from "./components/UI/UIcontrols";
-import Begin from "./components/UI/Begin";
+import Hud from "./components/UI/Hud";
 
 export default function Page() {
   return (
-    <main className="relative m-0 h-dvh w-dvw overflow-hidden select-none touch-none bg-black">
-      <div className="absolute inset-0 z-0">
-        <Experience />
-      </div>
-      <div className="absolute inset-0 z-10 pointer-events-none">
-        <FullScreen />
-        <UIcontrols />
-        <Begin />
-      </div>
-    </main>
+    <KeyboardProvider>
+      <main className="relative m-0 h-dvh w-dvw touch-none select-none overflow-hidden bg-black">
+        <div className="absolute inset-0 z-0">
+          <Experience />
+        </div>
+
+        <Hud />
+      </main>
+    </KeyboardProvider>
   );
 }

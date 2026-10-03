@@ -1,10 +1,9 @@
-"use Client";
-
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { MonishwarProvider } from "./components/contexts/MonishwarContext";
-import { DataProvider } from "./components/contexts/Data";
+import { SessionProvider } from "./components/contexts/SessionContext";
+import { PERSONAL_INFO, SUMMARY } from "./constants/portfolio.constants";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,8 +16,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Monishwar M C",
-  description: "Model lab",
+  title: `${PERSONAL_INFO.name} — ${PERSONAL_INFO.title}`,
+  description: SUMMARY.slice(0, 160),
+};
+
+/**
+ * Pinch-zoom and the iOS rubber band both fight the on-screen controls, so the
+ * viewport is locked. `viewportFit: cover` lets the HUD reach under the notch,
+ * which the safe-area insets in the HUD then respect.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#05070a",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -27,11 +41,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <DataProvider>
-        <MonishwarProvider>
-          <body>{children}</body>
-        </MonishwarProvider>
-      </DataProvider>
+      <body>
+        <SessionProvider>
+          <MonishwarProvider>{children}</MonishwarProvider>
+        </SessionProvider>
+      </body>
     </html>
   );
 }

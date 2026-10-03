@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { PositionalAudio, useGLTF } from "@react-three/drei";
 import { GLTF } from "three-stdlib";
 import { ThreeElements, useFrame } from "@react-three/fiber";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 
 type GLTFResult = GLTF & {
   nodes: {
@@ -25,8 +25,6 @@ export function Fountain(props: ThreeElements["group"]) {
   const { nodes, materials } = useGLTF(
     "/models/fountain.glb",
   ) as unknown as GLTFResult;
-
-  const [hasInteracted, setHasInteracted] = useState(false);
 
   const flowWaterRef = useRef<THREE.Mesh>(null);
   const waterGroupRef = useRef<THREE.Group>(null);
@@ -70,10 +68,8 @@ export function Fountain(props: ThreeElements["group"]) {
   const audioRef = useRef<THREE.PositionalAudio>(null);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.setVolume(6);
-    }
-  }, [hasInteracted]);
+    audioRef.current?.setVolume(6);
+  }, []);
 
   useFrame((state, delta) => {
     const time = state.clock.elapsedTime;
@@ -95,7 +91,7 @@ export function Fountain(props: ThreeElements["group"]) {
   });
 
   return (
-    <group {...props} dispose={null} position={[0, -1, 0]}>
+    <group {...props} dispose={null} position={[0, 0.03, 0]} scale={0.03}>
       <PositionalAudio
         url="/audio/fountain.mp3"
         distance={10}
