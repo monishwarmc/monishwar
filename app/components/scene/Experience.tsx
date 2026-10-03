@@ -3,14 +3,19 @@
 import { Canvas } from "@react-three/fiber";
 import Light from "./Light";
 import Camera from "./Camera";
-import { Fountain } from "../models/Fountain";
-import { World } from "../models/World";
+import World from "./World";
 import { Environment } from "@react-three/drei";
 
 const Experience = () => {
   return (
-    <Canvas>
-      <Environment preset="night" background />
+    <Canvas
+      camera={{
+        position: [3, 1, 4],
+        fov: 69,
+        near: 0.01,
+      }}
+    >
+      <Environment files={"/textures/space.hdr"} background />
       <Light />
       <Camera />
       <World />

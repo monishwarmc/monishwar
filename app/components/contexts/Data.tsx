@@ -1,21 +1,39 @@
 "use client";
 
-import { createContext, ReactNode, useRef, useContext } from "react";
-import { OrbitControls } from "three-stdlib";
+import { CameraControlsImpl } from "@react-three/drei";
+import React, {
+  createContext,
+  ReactNode,
+  useRef,
+  useContext,
+  useState,
+} from "react";
+import * as THREE from "three";
 
 interface DataType {
-  orbitRef: React.RefObject<OrbitControls | null>;
+  camRef: React.RefObject<CameraControlsImpl>;
+  spaceshipRef: React.RefObject<THREE.Group>;
+  worldRef: React.RefObject<THREE.Group>;
+  zoom: boolean;
+  setZoom: (val: boolean) => void;
 }
 
 const Data = createContext<DataType | undefined>(undefined);
 
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const orbitRef = useRef<OrbitControls>(null);
+  const camRef = useRef<CameraControlsImpl>(null!);
+  const spaceshipRef = useRef<THREE.Group>(null!);
+  const worldRef = useRef<THREE.Group>(null!);
+  const [zoom, setZoom] = useState(false);
 
   return (
     <Data.Provider
       value={{
-        orbitRef,
+        camRef,
+        spaceshipRef,
+        worldRef,
+        zoom,
+        setZoom,
       }}
     >
       {children}

@@ -22,7 +22,6 @@ export default function FullScreen() {
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore keypresses when typing in input fields
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -30,7 +29,6 @@ export default function FullScreen() {
         return;
       }
 
-      // Check for physical 'F' key press directly in the native stack frame
       if (e.code === "KeyF" || e.key === "f" || e.key === "F") {
         toggleFullscreen();
       }
@@ -49,13 +47,13 @@ export default function FullScreen() {
 
   return (
     <div
-      className="group fixed bottom-9 right-3 z-50 flex items-center justify-center rounded-full p-1 text-white shadow-lg cursor-pointer transition-transform active:scale-95"
+      className="group fixed bottom-9 right-3 z-50 flex items-center justify-center rounded-full p-1 text-white shadow-lg cursor-pointer pointer-events-auto transition-transform duration-300 ease-out hover:scale-110 active:scale-90"
       onClick={toggleFullscreen}
     >
       <span className="absolute inset-0 rounded-full border-2 border-white/60 pointer-events-none animate-[ping_2s_cubic-bezier(0,0,0.2,1)_3_forwards] group-hover:animate-[ping_1s_cubic-bezier(0,0,0.5,1)_infinite]" />
       <span className="absolute inset-0 rounded-full border border-white/40 pointer-events-none animate-[ping_2s_cubic-bezier(0,0,0.2,1)_3_forwards] [animation-delay:1s] group-hover:animate-[ping_1s_cubic-bezier(0,0,0.5,1)_infinite]" />
       <FullscreenIcon
-        className="relative z-10 transition-transform duration-300 ease-out group-hover:scale-125 text-black"
+        className="relative z-50 text-white transition-transform duration-300 ease-out group-hover:scale-110"
         fontSize="medium"
       />
     </div>

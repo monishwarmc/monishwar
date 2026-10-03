@@ -20,5 +20,9 @@ export default function UIcontrols() {
     },
   });
 
-  return <Leva />;
+  return (
+    <div className="pointer-events-auto">
+      <Leva />
+    </div>
+  );
 }

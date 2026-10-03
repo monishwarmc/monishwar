@@ -170,9 +170,11 @@ export function Monishwar({ animationSpeedRef, ...props }: MonishwarProps) {
 
   return (
     <group ref={ref} {...props} dispose={null}>
-      {animation == "sitting_on_chair" && <Sofa />}
-      <group name="Scene" position={[0, -1.03, 0]} scale={2}>
+      <group name="Scene" position={[0, 0.03, 0]} scale={0.03}>
         <group name="Armature" rotation={[0, 0, 0]}>
+          {animation == "sitting_on_chair" && (
+            <Sofa position={[0, 0.6, 0]} scale={0.6} />
+          )}
           <primitive
             object={nodes.Hips}
             name="Hips"
