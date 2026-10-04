@@ -3,6 +3,9 @@ import { PositionalAudio, useGLTF } from "@react-three/drei";
 import { GLTF } from "three-stdlib";
 import { ThreeElements, useFrame } from "@react-three/fiber";
 import { useRef, useEffect } from "react";
+import { registerObstacle } from "../controls/obstacles";
+import { useSettings } from "../settings/settings";
+import { FOUNTAIN, GROUND_Y } from "@/app/constants/world.constants";
 
 type GLTFResult = GLTF & {
   nodes: {
@@ -66,9 +69,21 @@ export function Fountain(props: ThreeElements["group"]) {
   }, [materials]);
 
   const audioRef = useRef<THREE.PositionalAudio>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  const { masterVolume, muted } = useSettings();
 
+  // PositionalAudio volume is a gain multiplier, not a 0-1 fraction; the
+  // fountain needs a healthy boost to carry across the deck.
   useEffect(() => {
-    audioRef.current?.setVolume(6);
+    audioRef.current?.setVolume(muted ? 0 : masterVolume * 8);
+  }, [masterVolume, muted]);
+
+  // The basin is solid; FOUNTAIN.collision is its outer lip in world units.
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+
+    return registerObstacle("fountain", { object: group, radius: FOUNTAIN.collision });
   }, []);
 
   useFrame((state, delta) => {
@@ -91,7 +106,13 @@ export function Fountain(props: ThreeElements["group"]) {
   });
 
   return (
-    <group {...props} dispose={null} position={[0, 0.03, 0]} scale={0.03}>
+    <group
+      ref={groupRef}
+      {...props}
+      dispose={null}
+      position={[0, GROUND_Y, 0]}
+      scale={FOUNTAIN.scale}
+    >
       <PositionalAudio
         url="/audio/fountain.mp3"
         distance={10}

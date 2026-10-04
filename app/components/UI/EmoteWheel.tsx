@@ -1,9 +1,13 @@
 "use client";
 
+import Image from "next/image";
+
 import CloseIcon from "@mui/icons-material/Close";
 import { useEffect, useState } from "react";
+import { startEmote } from "../controls/emoteState";
+import { setAutoRun } from "../controls/inputState";
 import { useSession } from "../contexts/SessionContext";
-import { useMonishwar } from "../contexts/MonishwarContext";
+import { ActionName, useMonishwar } from "../contexts/MonishwarContext";
 import { tapFeedback, useSettings } from "../settings/settings";
 import { EMOTES } from "./emotes";
 
@@ -28,7 +32,7 @@ const EmoteWheel = () => {
     const measure = () => {
       const shortEdge = Math.min(window.innerWidth, window.innerHeight);
       // Keep the ring and its buttons clear of the screen edges.
-      setRadius(Math.max(78, Math.min(150, shortEdge * 0.3)));
+      setRadius(Math.max(76, Math.min(150, shortEdge * 0.29)));
     };
 
     measure();
@@ -43,13 +47,16 @@ const EmoteWheel = () => {
 
   if (!open) return null;
 
-  const pick = (action: (typeof EMOTES)[number]["action"]) => {
+  const pick = (action: ActionName) => {
     tapFeedback();
+    // An emote roots the avatar, so it cannot sit on top of an auto-run.
+    setAutoRun(false);
+    startEmote();
     setAnimation(action);
     setOverlay("none");
   };
 
-  const buttonSize = radius < 100 ? 52 : 62;
+  const buttonSize = radius < 100 ? 54 : 66;
 
   return (
     <div
@@ -62,14 +69,17 @@ const EmoteWheel = () => {
     >
       <div
         className="relative"
-        style={{ height: radius * 2 + buttonSize, width: radius * 2 + buttonSize }}
+        style={{
+          height: radius * 2 + buttonSize,
+          width: radius * 2 + buttonSize,
+        }}
       >
         <span
           className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/20"
           style={{ height: radius * 2, width: radius * 2 }}
         />
 
-        {EMOTES.map(({ action, label, Icon }, index) => {
+        {EMOTES.map(({ action, label, icon }, index) => {
           // Start at the top, go clockwise.
           const angle = (index / EMOTES.length) * Math.PI * 2 - Math.PI / 2;
           const x = Math.cos(angle) * radius;
@@ -91,14 +101,21 @@ const EmoteWheel = () => {
                 top: "50%",
                 transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
               }}
-              className={`absolute flex touch-none flex-col items-center justify-center rounded-full border text-white transition-colors duration-150 active:scale-90 ${
+              className={`absolute touch-none rounded-full border-2 transition-transform duration-150 active:scale-90 ${
                 isHovered
-                  ? "border-emerald-300 bg-emerald-400/40"
-                  : "border-white/50 bg-black/55"
+                  ? "scale-110 border-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.6)]"
+                  : "border-white/60"
               }`}
             >
-              <Icon fontSize="small" />
-              <span className="mt-0.5 text-[9px] font-medium leading-none opacity-80">
+              <Image
+                src={icon}
+                alt=""
+                width={128}
+                height={128}
+                unoptimized
+                className="h-full w-full rounded-full object-cover"
+              />
+              <span className="pointer-events-none absolute -bottom-5 left-1/2 w-20 -translate-x-1/2 text-center text-[10px] font-semibold text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
                 {label}
               </span>
             </button>

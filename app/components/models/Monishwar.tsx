@@ -7,6 +7,7 @@ import { useMonishwar } from "../contexts/MonishwarContext";
 import { Sofa } from "./Sofa";
 import { GLTFResult } from "../../types/GLTFresult";
 import { createIdle } from "../animations/Animations";
+import { AVATAR_SCALE, GROUND_Y } from "@/app/constants/world.constants";
 
 const configureActionProps = (
   action: THREE.AnimationAction,
@@ -170,7 +171,7 @@ export function Monishwar({ animationSpeedRef, ...props }: MonishwarProps) {
 
   return (
     <group ref={ref} {...props} dispose={null}>
-      <group name="Scene" position={[0, 0.03, 0]} scale={0.03}>
+      <group name="Scene" position={[0, GROUND_Y, 0]} scale={AVATAR_SCALE}>
         <group name="Armature" rotation={[0, 0, 0]}>
           {animation == "sitting_on_chair" && (
             <Sofa position={[0, 0.6, 0]} scale={0.6} />

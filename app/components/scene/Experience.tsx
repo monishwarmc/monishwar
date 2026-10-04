@@ -7,6 +7,7 @@ import { QUALITY_PIXEL_RATIO, useSettings } from "../settings/settings";
 import Camera from "./Camera";
 import CharacterController from "./CharacterController";
 import Light from "./Light";
+import RenderGovernor from "./RenderGovernor";
 import World from "./World";
 
 const Experience = () => {
@@ -28,6 +29,7 @@ const Experience = () => {
         is mounted places the camera, so a re-render cannot yank it back.
       */}
       <PerspectiveCamera makeDefault fov={fieldOfView} near={0.01} far={200} />
+      <RenderGovernor />
 
       <Suspense fallback={null}>
         <Environment files="/textures/space.hdr" background={showBackground} />

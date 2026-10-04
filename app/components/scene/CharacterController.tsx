@@ -4,14 +4,19 @@ import { useKeyboardControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { ControlName, MOVEMENT } from "@/app/constants/controls.constants";
+import { ControlName, MOVEMENT, SPAWN } from "@/app/constants/controls.constants";
+import { SCALE } from "@/app/constants/world.constants";
 import {
   consumeJump,
   inputState,
   queueJump,
   setAutoRun,
 } from "../controls/inputState";
+import { playSfx } from "../audio/sfx";
+import { clearEmote, isEmoting } from "../controls/emoteState";
+import { resolveObstacles } from "../controls/obstacles";
 import { useSession } from "../contexts/SessionContext";
+import { focusZone, getZoneState } from "../world/zoneState";
 import { ActionName, useMonishwar } from "../contexts/MonishwarContext";
 import { useSettings } from "../settings/settings";
 
@@ -28,6 +33,9 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 
 /** Stick tilt past which "full tilt runs" kicks in. */
 const FULL_TILT = 0.85;
+
+/** Half-width of the avatar, used against obstacle circles. */
+const BODY_RADIUS = 0.012 * SCALE;
 
 /**
  * Per-frame scratch space. Module scope rather than `useMemo` because only one
@@ -72,7 +80,7 @@ const angleDelta = (from: number, to: number) => {
  */
 const CharacterController = () => {
   const { spaceshipRef, exploring } = useSession();
-  const { ref, setAnimation } = useMonishwar();
+  const { ref, animation, setAnimation } = useMonishwar();
   const [subscribeKeys, getKeys] = useKeyboardControls<ControlName>();
   const camera = useThree((state) => state.camera);
   const settings = useSettings();
@@ -110,6 +118,27 @@ const CharacterController = () => {
   const yaw = useRef(0);
   const ground = useRef<THREE.Mesh | null>(null);
   const groundRadius = useRef(0);
+  const spawned = useRef(false);
+
+  // Drop the avatar on its mark each time explore mode starts, so the camera
+  // always opens on it from the same distance rather than wherever the last
+  // session left it.
+  useEffect(() => {
+    if (!exploring) {
+      spawned.current = false;
+      return;
+    }
+
+    const character = ref.current;
+    if (!character) return;
+
+    character.position.set(SPAWN.x, character.position.y, SPAWN.z);
+    character.rotation.y = SPAWN.yaw;
+
+    yaw.current = SPAWN.yaw;
+    velocity.current.set(0, 0, 0);
+    spawned.current = true;
+  }, [exploring, ref]);
 
   /** Caches the grass mesh and its usable radius once the GLB is in the graph. */
   const resolveGround = () => {
@@ -159,6 +188,26 @@ const CharacterController = () => {
     let inputMagnitude = Math.min(Math.hypot(inputX, inputY), 1);
     const steering = inputMagnitude > 1e-4;
 
+    // Walking away from a station you are reading should just work, rather
+    // than leaving the camera parked on its board while the avatar leaves.
+    if (steering && getZoneState().focused) focusZone(null);
+
+    // An emote is a whole-body clip, so the legs are not being animated while
+    // it plays. Steering cancels it; until then the avatar is rooted, which is
+    // what stops it sliding across the grass in a standing pose.
+    const emoting = isEmoting();
+
+    if (emoting) {
+      if (steering) {
+        clearEmote();
+      } else {
+        velocity.current.set(0, 0, 0);
+        inputX = 0;
+        inputY = 0;
+        inputMagnitude = 0;
+      }
+    }
+
     // Taking the stick or the arrow keys normally wins: it drops auto-run and
     // hands the player a walk, which is the slower, more precise speed. The
     // setting lets anyone who prefers it keep the pace while steering.
@@ -167,7 +216,10 @@ const CharacterController = () => {
     }
 
     const autoRunning =
-      exploring && inputState.autoRun && (!steering || !settings.autoRunCancelsOnSteer);
+      exploring &&
+      inputState.autoRun &&
+      !isEmoting() &&
+      (!steering || !settings.autoRunCancelsOnSteer);
 
     if (autoRunning && !steering) {
       // Straight ahead, wherever the camera is now pointing — so orbiting the
@@ -235,6 +287,15 @@ const CharacterController = () => {
       velocityVector.multiplyScalar(0.2);
     }
 
+    // Slide around anything solid standing on the disc.
+    //
+    // Nothing is done to the velocity here on purpose. An earlier version cut
+    // it to 30% on any contact, which made running past a station feel like
+    // wading: brushing a shoulder against the plinth killed the sprint. The
+    // push-out below already removes the component heading into the obstacle,
+    // and the component sliding along it should survive untouched.
+    resolveObstacles(scratch.next, scratch.position.y, BODY_RADIUS);
+
     // Jump — only from the floor, so it cannot be spammed mid-air. Draining
     // the queue every frame also discards anything pressed before explore mode.
     const jumpRequested = consumeJump();
@@ -242,6 +303,7 @@ const CharacterController = () => {
     if (jumpRequested && grounded.current && exploring) {
       grounded.current = false;
       airVelocity.current = settings.jumpPower;
+      playSfx("jump", 0.5);
       setAnimation("Jumping");
     }
 
@@ -308,7 +370,18 @@ const CharacterController = () => {
           ? "walk"
           : "idle";
 
-    if (next !== moveState.current || justLanded) {
+    if (isEmoting()) {
+      // Leave the emote clip alone; the avatar is standing still for it.
+      moveState.current = "idle";
+      return;
+    }
+
+    // Re-assert on every change, and whenever the avatar is moving but the
+    // mixer is still on some other clip — that is the case an emote leaves
+    // behind when movement cancels it.
+    const stale = next !== "idle" && animation !== MOVE_ANIMATION[next];
+
+    if (next !== moveState.current || justLanded || stale) {
       moveState.current = next;
       setAnimation(MOVE_ANIMATION[next]);
     }

@@ -11,6 +11,9 @@ import {
 
 export type Quality = "low" | "balanced" | "high";
 
+/** 0 means "as fast as the display allows". */
+export type FrameLimit = 0 | 30 | 60;
+
 export type Settings = {
   // --- Camera ---
   lookSensitivity: number;
@@ -34,6 +37,10 @@ export type Settings = {
 
   // --- HUD ---
   mirrorHud: boolean;
+  /** Scales the touch action buttons without touching the stick. */
+  hudScale: number;
+  /** Re-show the control guide the next time explore mode starts. */
+  showHelpOnStart: boolean;
   floatingStick: boolean;
   stickScale: number;
   hudOpacity: number;
@@ -44,6 +51,19 @@ export type Settings = {
   // --- Display ---
   quality: Quality;
   showBackground: boolean;
+  /**
+   * Capping the frame rate is the single biggest lever on how hard the GPU
+   * works — an uncapped canvas will happily render 120fps and cook a laptop.
+   */
+  frameLimit: FrameLimit;
+  /** Blades of grass at `balanced`; scaled by quality at build time. */
+  grassDensity: number;
+  /** Fill light added on top of the scene's own rig. 0 disables it. */
+  sceneBrightness: number;
+
+  // --- Audio ---
+  masterVolume: number;
+  muted: boolean;
 
   // --- Keys ---
   bindings: Bindings;
@@ -72,6 +92,8 @@ export const DEFAULT_SETTINGS: Settings = {
   stickFullTiltRuns: false,
 
   mirrorHud: false,
+  hudScale: 1,
+  showHelpOnStart: true,
   floatingStick: true,
   stickScale: 1,
   hudOpacity: 1,
@@ -81,11 +103,19 @@ export const DEFAULT_SETTINGS: Settings = {
 
   quality: "balanced",
   showBackground: true,
+  frameLimit: 60,
+  grassDensity: 1,
+  sceneBrightness: 1,
+
+  masterVolume: 0.5,
+  muted: false,
 
   bindings: createDefaultBindings(),
 };
 
-const STORAGE_KEY = "portfolio.settings.v1";
+// v2: `interact` was added and `emote` moved off E, so v1 bindings would
+// have fired two actions from one key.
+const STORAGE_KEY = "portfolio.settings.v2";
 
 /**
  * Settings live in a module-level store read through `useSyncExternalStore`

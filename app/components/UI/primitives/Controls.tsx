@@ -20,6 +20,7 @@ import { tapFeedback } from "../../settings/settings";
 
 export const HudButton = ({
   label,
+  caption,
   size,
   active,
   opacity = 1,
@@ -28,6 +29,8 @@ export const HudButton = ({
   children,
 }: {
   label: string;
+  /** Word shown under the button, so nothing rests on reading the picture. */
+  caption?: string;
   size: number;
   active?: boolean;
   opacity?: number;
@@ -35,6 +38,10 @@ export const HudButton = ({
   onPress: () => void;
   children: ReactNode;
 }) => (
+  <span
+    style={{ opacity }}
+    className="pointer-events-none flex flex-col items-center gap-0.5"
+  >
   <button
     type="button"
     aria-label={label}
@@ -56,15 +63,21 @@ export const HudButton = ({
           }
         : undefined
     }
-    style={{ height: size, width: size, opacity }}
-    className={`pointer-events-auto flex shrink-0 touch-none items-center justify-center rounded-full border backdrop-blur-[2px] transition-transform duration-150 active:scale-90 ${
+    style={{ height: size, width: size }}
+    className={`pointer-events-auto flex shrink-0 touch-none items-center justify-center overflow-hidden rounded-full border backdrop-blur-[2px] transition-transform duration-150 active:scale-90 ${
       active
-        ? "border-emerald-300/80 bg-emerald-400/30 text-emerald-50"
+        ? "border-emerald-300 bg-emerald-400/30 text-emerald-50 ring-2 ring-emerald-300/50"
         : "border-white/60 bg-black/30 text-white"
     }`}
   >
     {children}
   </button>
+    {caption && (
+      <span className="text-[9px] font-semibold uppercase tracking-wide text-white/75 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+        {caption}
+      </span>
+    )}
+  </span>
 );
 
 export const Slider = ({

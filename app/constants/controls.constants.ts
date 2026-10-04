@@ -20,7 +20,10 @@ export const DEFAULT_BINDINGS = {
   run: ["Shift"],
   autoRun: ["r", "R"],
   jump: [" "],
-  emote: ["e", "E"],
+  /** Open whichever station the avatar is standing at. */
+  interact: ["e", "E"],
+  /** Taunt key, the way most shooters bind it. */
+  emote: ["t", "T"],
   settings: ["o", "O"],
   fullscreen: ["f", "F"],
   exit: ["Escape"],
@@ -39,6 +42,7 @@ export const CONTROL_LABELS: { name: ControlName; label: string }[] = [
   { name: "run", label: "Sprint (hold)" },
   { name: "autoRun", label: "Auto-run" },
   { name: "jump", label: "Jump" },
+  { name: "interact", label: "Open station" },
   { name: "emote", label: "Emote wheel" },
   { name: "settings", label: "Settings" },
   { name: "fullscreen", label: "Fullscreen" },
@@ -63,25 +67,41 @@ export const KEY_LABELS: Record<string, string> = {
 
 export const describeKey = (key: string) => KEY_LABELS[key] ?? key.toUpperCase();
 
+import { GROUND_Y, SCALE } from "./world.constants";
+
+/**
+ * Where the avatar stands when explore mode opens, and which way it faces.
+ *
+ * Shared because two components need it in the same frame: the controller
+ * places the avatar, and the follow camera seats itself behind that heading.
+ * Deriving one from the other made the result depend on mount order.
+ */
+export const SPAWN = {
+  x: 0,
+  z: 0.42,
+  /** Facing back towards the fountain at the centre of the deck. */
+  yaw: Math.PI,
+} as const;
+
 export const MOVEMENT = {
-  walkSpeed: 0.055,
-  runSpeed: 0.135,
+  walkSpeed: 0.055 * SCALE,
+  runSpeed: 0.135 * SCALE,
   /** Higher = snappier start/stop. Used as an exponential damping rate. */
   acceleration: 10,
   /** Radians per second the avatar turns toward its heading. */
   turnRate: 10,
-  jumpVelocity: 0.13,
-  gravity: 0.4,
+  jumpVelocity: 0.13 * SCALE,
+  gravity: 0.4 * SCALE,
   /**
    * The avatar's inner group sits 0.03 above its outer group (see Monishwar),
    * so the outer group has to be pushed down by this much for the feet to land
    * exactly on the ground hit point.
    */
-  feetOffset: 0.03,
+  feetOffset: GROUND_Y,
   /** Keep the avatar off the very lip of the grass disc. */
   edgeMargin: 0.94,
   /** Below this world speed the avatar is considered standing still. */
-  idleThreshold: 0.004,
+  idleThreshold: 0.004 * SCALE,
   /** Above this fraction of runSpeed the run animation takes over. */
   runAnimationRatio: 0.72,
   /** Set to Math.PI if the avatar ever ends up walking backwards. */
@@ -89,11 +109,11 @@ export const MOVEMENT = {
 } as const;
 
 export const FOLLOW_CAMERA = {
-  distance: 0.16,
-  minDistance: 0.08,
-  maxDistance: 0.55,
+  distance: 0.16 * SCALE,
+  minDistance: 0.08 * SCALE,
+  maxDistance: 0.55 * SCALE,
   /** Height above the feet that the camera aims at — roughly the shoulders. */
-  lookHeight: 0.034,
+  lookHeight: 0.034 * SCALE,
   minPitch: -0.3,
   maxPitch: 1.15,
   /** Radians of yaw per pixel dragged. */
@@ -104,6 +124,6 @@ export const FOLLOW_CAMERA = {
   positionLambda: 9,
   targetLambda: 14,
   /** Never let the camera sink into the grass. */
-  groundClearance: 0.012,
+  groundClearance: 0.012 * SCALE,
   fieldOfView: 69,
 } as const;

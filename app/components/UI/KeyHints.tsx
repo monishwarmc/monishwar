@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 import { ControlName, describeKey } from "@/app/constants/controls.constants";
 import { useSettings } from "../settings/settings";
 
-const HINTS: { controls: ControlName[]; label: string; literal?: string[] }[] = [
-  { controls: ["forward", "left", "backward", "right"], label: "move" },
-  { controls: ["autoRun"], label: "auto-run" },
-  { controls: ["run"], label: "sprint" },
-  { controls: ["jump"], label: "jump" },
-  { controls: ["emote"], label: "emotes" },
-  { controls: [], label: "orbit", literal: ["Drag"] },
-  { controls: ["settings"], label: "settings" },
-];
+const HINTS: { controls: ControlName[]; label: string; literal?: string[] }[] =
+  [
+    { controls: ["forward", "left", "backward", "right"], label: "move" },
+    { controls: ["autoRun"], label: "auto-run" },
+    { controls: ["run"], label: "sprint" },
+    { controls: ["jump"], label: "jump" },
+    { controls: ["emote"], label: "emotes" },
+    { controls: [], label: "orbit", literal: ["Drag"] },
+    { controls: ["settings"], label: "settings" },
+  ];
 
 /**
  * Desktop legend. It reads the player's own bindings, so a rebound key shows
@@ -43,7 +44,8 @@ const KeyHints = () => {
     >
       {HINTS.map(({ controls, label, literal }) => {
         // Only the first key of each action, or the legend turns into a wall.
-        const keys = literal ?? controls.map((name) => bindings[name]?.[0] ?? "");
+        const keys =
+          literal ?? controls.map((name) => bindings[name]?.[0] ?? "");
 
         return (
           <div key={label} className="flex items-center gap-2 text-xs">

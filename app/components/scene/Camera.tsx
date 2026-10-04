@@ -1,19 +1,35 @@
 "use client";
 
 import { CameraControls } from "@react-three/drei";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import * as THREE from "three";
 import { useSession } from "../contexts/SessionContext";
 import FollowCamera from "./FollowCamera";
 
 /** Framing for the idle showcase: far enough out to see the whole ship. */
-const IDLE_VIEW = [3, 1, 4, 0, 0, 0] as const;
+const IDLE_VIEW = [3.6, 1.6, 4.6, 0, 0, 0] as const;
+
+/** Fallback until the GLB is in the graph and can be measured. */
+const FALLBACK_SHELL = 4.2;
 
 const OrbitShowcase = () => {
-  const { camRef } = useSession();
+  const { camRef, spaceshipRef } = useSession();
 
-  // The default camera carries no position of its own, so the rig that is
-  // mounted decides the framing. Doing it here keeps the idle view identical
-  // on first load and on every return from explore mode.
+  // Keeping the camera outside the hull is a measured constraint, not a magic
+  // number: the solar ring reaches much further than the glass dome, so the
+  // minimum orbit distance is the ship's own bounding sphere plus a margin.
+  const [shell, setShell] = useState(FALLBACK_SHELL);
+
+  useEffect(() => {
+    const ship = spaceshipRef.current;
+    if (!ship) return;
+
+    const box = new THREE.Box3().setFromObject(ship);
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+
+    if (sphere.radius > 0) setShell(sphere.radius * 1.08);
+  }, [spaceshipRef]);
+
   useEffect(() => {
     camRef.current?.setLookAt(...IDLE_VIEW, false);
   }, [camRef]);
@@ -21,10 +37,14 @@ const OrbitShowcase = () => {
   return (
     <CameraControls
       ref={camRef}
-      maxDistance={20}
-      minDistance={0.5}
-      maxPolarAngle={Math.PI * 0.85}
-      zoom={true}
+      // Full polar sweep so the ship can be inspected from directly overhead
+      // and from underneath, which is where the solar array and thruster live.
+      minPolarAngle={0.01}
+      maxPolarAngle={Math.PI - 0.01}
+      minDistance={shell}
+      maxDistance={shell * 3.5}
+      smoothTime={0.32}
+      dollySpeed={0.6}
     />
   );
 };
@@ -32,7 +52,7 @@ const OrbitShowcase = () => {
 /**
  * Two camera modes, mutually exclusive.
  *
- * Idle: `CameraControls` lets visitors orbit the floating spaceship.
+ * Idle: `CameraControls` orbits the floating spaceship from outside its hull.
  * Explore: the orbit rig is unmounted so `FollowCamera` owns the camera
  * outright — leaving both mounted would make them fight over its transform.
  */

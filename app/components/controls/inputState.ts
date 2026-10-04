@@ -22,6 +22,12 @@ export const inputState = {
   lookY: 0,
   /** Pinch/wheel camera distance delta, accumulated between frames. */
   zoomDelta: 0,
+  /**
+   * True once the current gesture has moved far enough to be a look-drag.
+   * 3D buttons check it so releasing a camera drag over a button does not
+   * press it.
+   */
+  dragged: false,
 };
 
 /**
@@ -55,12 +61,16 @@ export const resetInput = () => {
   inputState.lookX = 0;
   inputState.lookY = 0;
   inputState.zoomDelta = 0;
+  inputState.dragged = false;
   setAutoRun(false);
 };
 
 export const queueJump = () => {
   inputState.jumpQueued = true;
 };
+
+/** Set by the controller so the HUD and the scene can react to a landing. */
+export const JUMP_SOUND_GAIN = 0.5;
 
 /** Returns true once per queued jump. */
 export const consumeJump = () => {

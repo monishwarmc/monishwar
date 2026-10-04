@@ -46,7 +46,9 @@ const Intro = () => {
       </button>
 
       <p className="text-[11px] text-white/45">
-        {isTouch ? "Stick to move · drag to look" : "WASD to move · drag to look"}
+        {isTouch
+          ? "Stick to move · drag to look"
+          : "WASD to move · drag to look"}
       </p>
     </div>
   );

@@ -4,6 +4,7 @@ import { useKeyboardControls } from "@react-three/drei";
 import { useEffect } from "react";
 import { ControlName } from "@/app/constants/controls.constants";
 import { useSession } from "../contexts/SessionContext";
+import { focusZone, getZoneState } from "../world/zoneState";
 import { toggleFullscreen } from "./fullscreen";
 
 /**
@@ -59,8 +60,11 @@ const GlobalHotkeys = () => {
         (pressed) => {
           if (!pressed) return;
 
-          // Back out one layer at a time: overlay first, then explore mode.
-          if (overlay !== "none") setOverlay("none");
+          // Back out one layer at a time. Reading a station is the
+          // innermost layer and is not part of `overlay`, so it is checked
+          // first — otherwise Escape at a station quit explore mode outright.
+          if (getZoneState().focused) focusZone(null);
+          else if (overlay !== "none") setOverlay("none");
           else if (exploring) stopExploring();
         },
       ),

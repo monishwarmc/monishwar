@@ -21,7 +21,7 @@ type GLTFResult = GLTF & {
   materials: {
     Poliigon_MetalSteelBrushed_7174_2K: THREE.MeshStandardMaterial;
     Material: THREE.MeshPhysicalMaterial;
-    ["Grass.001"]: THREE.MeshStandardMaterial;
+    ["GroundDirtRocky020_2K"]: THREE.MeshStandardMaterial;
     ["Silver Spaceship metal plate.001"]: THREE.MeshStandardMaterial;
     ["Solar panels.001"]: THREE.MeshStandardMaterial;
   };
@@ -69,7 +69,7 @@ export function Spaceship(props: ThreeElements["group"]) {
         castShadow
         receiveShadow
         geometry={nodes.ground.geometry}
-        material={materials["Grass.001"]}
+        material={materials["GroundDirtRocky020_2K"]}
       />
       <mesh
         name="Cone"

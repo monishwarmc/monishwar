@@ -5,8 +5,18 @@ import { useRef } from "react";
 import * as THREE from "three";
 import { Monishwar } from "../models/Monishwar";
 import { Spaceship } from "../models/Spaceship";
-import { useSession } from "../contexts/SessionContext";
 import { Fountain } from "../models/Fountain";
+import { useSession } from "../contexts/SessionContext";
+import GrassField from "../world/GrassField";
+import ZoneWatcher from "../world/ZoneWatcher";
+import {
+  AboutPillar,
+  CertificationKiosk,
+  ContactTower,
+  ProjectTheatre,
+  SkillTree,
+  TimelineWalk,
+} from "../world/stations";
 
 /** How fast the idle drift settles once the player takes control. */
 const SETTLE_RATE = 3;
@@ -51,8 +61,19 @@ const World = () => {
   return (
     <group ref={worldRef}>
       <Spaceship />
-      <Monishwar />
+      <GrassField />
       <Fountain />
+
+      {/* The six stations, arranged on a ring around the fountain. */}
+      <AboutPillar />
+      <SkillTree />
+      <TimelineWalk />
+      <ProjectTheatre />
+      <CertificationKiosk />
+      <ContactTower />
+
+      <Monishwar />
+      <ZoneWatcher />
     </group>
   );
 };

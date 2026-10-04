@@ -1,8 +1,8 @@
 "use client";
 
-import DirectionsRunIcon from "@mui/icons-material/DirectionsRun";
+import Image from "next/image";
+
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
-import SportsHandballIcon from "@mui/icons-material/SportsHandball";
 import { useSyncExternalStore } from "react";
 import {
   getAutoRun,
@@ -13,14 +13,19 @@ import {
 } from "../controls/inputState";
 import { useSession } from "../contexts/SessionContext";
 import { useSettings } from "../settings/settings";
+import { CONTROL_ICONS } from "./emotes";
 import { HudButton } from "./primitives/Controls";
 
 /**
  * Jump / auto-run / emote cluster, laid out under the thumb opposite the stick.
+ *
+ * Jump and auto-run show the avatar actually doing the thing rather than an
+ * arrow, which is the clearest a 56px button gets, and each carries a word
+ * underneath so nothing rests on reading the picture.
  */
 const ActionButtons = () => {
   const { overlay, toggleOverlay } = useSession();
-  const { mirrorHud, hudOpacity } = useSettings();
+  const { mirrorHud, hudOpacity, hudScale } = useSettings();
 
   // Read through the store rather than local state: the controller switches
   // auto-run off the moment the player steers, and the button has to go dark
@@ -31,6 +36,8 @@ const ActionButtons = () => {
     () => false,
   );
 
+  const size = (base: number) => Math.round(base * hudScale);
+
   return (
     <div
       style={{ opacity: hudOpacity }}
@@ -39,12 +46,13 @@ const ActionButtons = () => {
       }`}
     >
       <div
-        className={`flex flex-col gap-3 ${mirrorHud ? "items-start" : "items-end"}`}
+        className={`flex flex-col gap-2.5 ${mirrorHud ? "items-start" : "items-end"}`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <HudButton
             label="Emotes"
-            size={52}
+            caption="Emote"
+            size={size(48)}
             trigger="click"
             active={overlay === "emotes"}
             onPress={() => toggleOverlay("emotes")}
@@ -54,16 +62,36 @@ const ActionButtons = () => {
 
           <HudButton
             label="Auto-run"
-            size={62}
+            caption="Run"
+            size={size(54)}
             active={autoRunning}
             onPress={() => setAutoRun(!inputState.autoRun)}
           >
-            <DirectionsRunIcon fontSize="medium" />
+            <Image
+              src={CONTROL_ICONS.run}
+              alt=""
+              width={128}
+              height={128}
+              unoptimized
+              className="h-full w-full rounded-full object-cover"
+            />
           </HudButton>
         </div>
 
-        <HudButton label="Jump" size={84} onPress={queueJump}>
-          <SportsHandballIcon fontSize="large" />
+        <HudButton
+          label="Jump"
+          caption="Jump"
+          size={size(62)}
+          onPress={queueJump}
+        >
+          <Image
+            src={CONTROL_ICONS.jump}
+            alt=""
+            width={128}
+            height={128}
+            unoptimized
+            className="h-full w-full rounded-full object-cover"
+          />
         </HudButton>
       </div>
     </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import CloseIcon from "@mui/icons-material/Close";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
@@ -12,6 +14,7 @@ import { useSession } from "../contexts/SessionContext";
 import { useMonishwar } from "../contexts/MonishwarContext";
 import { useIsTouch } from "../hooks/useIsTouch";
 import {
+  FrameLimit,
   Quality,
   resetSettings,
   setBinding,
@@ -27,6 +30,7 @@ import {
   toggleFullscreen,
 } from "./fullscreen";
 import { EMOTES, EXTRA_EMOTES } from "./emotes";
+import { startEmote } from "../controls/emoteState";
 import {
   DangerButton,
   Section,
@@ -68,7 +72,8 @@ const useKeyCapture = (
     // Capture phase so drei's own window listener does not act on the press
     // the player is only trying to assign.
     window.addEventListener("keydown", handle, { capture: true });
-    return () => window.removeEventListener("keydown", handle, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handle, { capture: true });
   }, [capturing, onCaptured, onCancel]);
 };
 
@@ -239,7 +244,9 @@ const SettingsPanel = () => {
                   label="Floating stick"
                   hint="The stick re-seats wherever your thumb lands"
                   value={settings.floatingStick}
-                  onChange={(floatingStick) => updateSettings({ floatingStick })}
+                  onChange={(floatingStick) =>
+                    updateSettings({ floatingStick })
+                  }
                 />
                 <Slider
                   label="Stick size"
@@ -309,7 +316,9 @@ const SettingsPanel = () => {
                 max={FOLLOW_CAMERA.maxDistance}
                 step={0.01}
                 format={(value) => value.toFixed(2)}
-                onChange={(cameraDistance) => updateSettings({ cameraDistance })}
+                onChange={(cameraDistance) =>
+                  updateSettings({ cameraDistance })
+                }
               />
               <Slider
                 label="Shoulder height"
@@ -336,7 +345,9 @@ const SettingsPanel = () => {
                 max={2.5}
                 step={0.05}
                 format={(value) => `${value.toFixed(2)}×`}
-                onChange={(cameraSmoothing) => updateSettings({ cameraSmoothing })}
+                onChange={(cameraSmoothing) =>
+                  updateSettings({ cameraSmoothing })
+                }
               />
             </Section>
           )}
@@ -399,11 +410,71 @@ const SettingsPanel = () => {
                   Lower this first if the frame rate drops on a phone — it caps
                   the pixel ratio rather than changing what is drawn.
                 </p>
+                <Segmented<string>
+                  label="Frame rate cap"
+                  value={String(settings.frameLimit)}
+                  options={[
+                    { value: "30", label: "30 fps" },
+                    { value: "60", label: "60 fps" },
+                    { value: "0", label: "Uncapped" },
+                  ]}
+                  onChange={(value) =>
+                    updateSettings({ frameLimit: Number(value) as FrameLimit })
+                  }
+                />
+                <p className="pb-2 text-xs text-white/45">
+                  Capping the frame rate is the biggest lever on how hot a
+                  laptop gets — an uncapped canvas will render 120fps for a
+                  scene that looks the same at 60.
+                </p>
                 <Toggle
                   label="Starfield background"
                   value={settings.showBackground}
-                  onChange={(showBackground) => updateSettings({ showBackground })}
+                  onChange={(showBackground) =>
+                    updateSettings({ showBackground })
+                  }
                 />
+                <Slider
+                  label="Brightness"
+                  value={settings.sceneBrightness}
+                  min={0}
+                  max={2.5}
+                  step={0.1}
+                  format={(value) => `${value.toFixed(1)}×`}
+                  onChange={(sceneBrightness) => updateSettings({ sceneBrightness })}
+                />
+                <Slider
+                  label="Grass density"
+                  value={settings.grassDensity}
+                  min={0}
+                  max={1.5}
+                  step={0.1}
+                  format={percent}
+                  onChange={(grassDensity) => updateSettings({ grassDensity })}
+                />
+              </Section>
+
+              <Section title="Audio">
+                <Toggle
+                  label="Mute everything"
+                  value={settings.muted}
+                  onChange={(muted) => updateSettings({ muted })}
+                />
+                <Slider
+                  label="Volume"
+                  value={settings.masterVolume}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  format={percent}
+                  onChange={(masterVolume) =>
+                    updateSettings({ masterVolume, muted: false })
+                  }
+                />
+                <p className="pb-2 text-xs text-white/45">
+                  Drives the fountain&apos;s running water. Browsers keep audio
+                  silent until you interact with the page.
+                </p>
               </Section>
 
               <Section title="Animations">
@@ -411,18 +482,43 @@ const SettingsPanel = () => {
                   The wheel holds the eight quick ones. Everything else lives
                   here.
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[...EMOTES, ...EXTRA_EMOTES].map(({ action, label, Icon }) => (
+                <div className="grid grid-cols-4 gap-2 pb-3">
+                  {EMOTES.map(({ action, label, icon }) => (
                     <button
                       key={action}
                       type="button"
                       onClick={() => {
                         tapFeedback();
+                        startEmote();
                         setAnimation(action);
                       }}
-                      className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-left text-xs text-white/80 transition-colors hover:border-emerald-300/60 hover:bg-emerald-400/10"
+                      className="flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1.5 text-[10px] text-white/75 transition-colors hover:border-emerald-300/60 hover:bg-emerald-400/10"
                     >
-                      <Icon fontSize="small" />
+                      <Image
+                        src={icon}
+                        alt=""
+                        width={128}
+                        height={128}
+                        unoptimized
+                        className="h-10 w-10 rounded-full"
+                      />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {EXTRA_EMOTES.map(({ action, label }) => (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => {
+                        tapFeedback();
+                        startEmote();
+                        setAnimation(action);
+                      }}
+                      className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-left text-xs text-white/80 transition-colors hover:border-emerald-300/60 hover:bg-emerald-400/10"
+                    >
                       <span className="truncate">{label}</span>
                     </button>
                   ))}
@@ -432,30 +528,90 @@ const SettingsPanel = () => {
           )}
 
           {tab === "keys" && (
-            <Section title="Key bindings">
-              <p className="pb-2 text-xs text-white/45">
-                {isTouch
-                  ? "These apply when a keyboard is attached. Tap + then press a key; tap a key to remove it."
-                  : "Press + then any key to add it. Click a key to remove it. Esc cancels."}
-              </p>
-
-              {CONTROL_LABELS.map(({ name, label }) => (
-                <KeyBindingRow
-                  key={name}
-                  name={name}
-                  label={label}
-                  keys={settings.bindings[name]}
-                  capturing={capturing === name}
-                  onStartCapture={setCapturing}
-                  onRemove={(control, key) =>
-                    setBinding(
-                      control,
-                      settings.bindings[control].filter((item) => item !== key),
-                    )
+            <>
+              {/* A phone has no keys to bind, so the same tab carries the
+                  things a thumb actually cares about. */}
+              <Section title="Touch controls">
+                <Slider
+                  label="Button size"
+                  value={settings.hudScale}
+                  min={0.75}
+                  max={1.4}
+                  step={0.05}
+                  format={percent}
+                  onChange={(hudScale) => updateSettings({ hudScale })}
+                />
+                <Slider
+                  label="Stick size"
+                  value={settings.stickScale}
+                  min={0.7}
+                  max={1.5}
+                  step={0.05}
+                  format={percent}
+                  onChange={(stickScale) => updateSettings({ stickScale })}
+                />
+                <Toggle
+                  label="Left-handed layout"
+                  hint="Stick on the right, actions on the left"
+                  value={settings.mirrorHud}
+                  onChange={(mirrorHud) => updateSettings({ mirrorHud })}
+                />
+                <Toggle
+                  label="Floating stick"
+                  hint="The stick re-seats wherever your thumb lands"
+                  value={settings.floatingStick}
+                  onChange={(floatingStick) =>
+                    updateSettings({ floatingStick })
                   }
                 />
-              ))}
-            </Section>
+                <Toggle
+                  label="Full tilt runs"
+                  hint="Pushing the stick to the rim runs without the button"
+                  value={settings.stickFullTiltRuns}
+                  onChange={(stickFullTiltRuns) =>
+                    updateSettings({ stickFullTiltRuns })
+                  }
+                />
+                <Slider
+                  label="Look sensitivity"
+                  value={settings.lookSensitivity}
+                  min={0.3}
+                  max={3}
+                  step={0.05}
+                  format={(value) => `${value.toFixed(2)}×`}
+                  onChange={(lookSensitivity) =>
+                    updateSettings({ lookSensitivity })
+                  }
+                />
+              </Section>
+
+              <Section title="Key bindings">
+                <p className="pb-2 text-xs text-white/45">
+                  {isTouch
+                    ? "These apply when a keyboard is attached. Tap + then press a key; tap a key to remove it."
+                    : "Press + then any key to add it. Click a key to remove it. Esc cancels."}
+                </p>
+
+                {CONTROL_LABELS.map(({ name, label }) => (
+                  <KeyBindingRow
+                    key={name}
+                    name={name}
+                    label={label}
+                    keys={settings.bindings[name]}
+                    capturing={capturing === name}
+                    onStartCapture={setCapturing}
+                    onRemove={(control, key) =>
+                      setBinding(
+                        control,
+                        settings.bindings[control].filter(
+                          (item) => item !== key,
+                        ),
+                      )
+                    }
+                  />
+                ))}
+              </Section>
+            </>
           )}
 
           {tab === "session" && (
@@ -473,6 +629,11 @@ const SettingsPanel = () => {
                   add the page to your home screen for a fullscreen window.
                 </p>
               )}
+
+              <DangerButton
+                label="Show the control guide"
+                onPress={() => setOverlay("help")}
+              />
 
               {exploring && (
                 <DangerButton
