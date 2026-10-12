@@ -1,10 +1,10 @@
 import * as THREE from "three";
-import { PositionalAudio, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { GLTF } from "three-stdlib";
 import { ThreeElements, useFrame } from "@react-three/fiber";
 import { useRef, useEffect } from "react";
+import AmbientLoop from "../audio/AmbientLoop";
 import { registerObstacle } from "../controls/obstacles";
-import { useSettings } from "../settings/settings";
 import { FOUNTAIN, GROUND_Y } from "@/app/constants/world.constants";
 
 type GLTFResult = GLTF & {
@@ -68,15 +68,7 @@ export function Fountain(props: ThreeElements["group"]) {
     }
   }, [materials]);
 
-  const audioRef = useRef<THREE.PositionalAudio>(null);
   const groupRef = useRef<THREE.Group>(null);
-  const { masterVolume, muted } = useSettings();
-
-  // PositionalAudio volume is a gain multiplier, not a 0-1 fraction; the
-  // fountain needs a healthy boost to carry across the deck.
-  useEffect(() => {
-    audioRef.current?.setVolume(muted ? 0 : masterVolume * 8);
-  }, [masterVolume, muted]);
 
   // The basin is solid; FOUNTAIN.collision is its outer lip in world units.
   useEffect(() => {
@@ -113,13 +105,9 @@ export function Fountain(props: ThreeElements["group"]) {
       position={[0, GROUND_Y, 0]}
       scale={FOUNTAIN.scale}
     >
-      <PositionalAudio
-        url="/audio/fountain.mp3"
-        distance={10}
-        loop
-        autoplay
-        ref={audioRef}
-      />
+      {/* Loud with your feet in the basin, a murmur from the rim of the deck.
+          AmbientLoop explains why this is not drei's <PositionalAudio>. */}
+      <AmbientLoop url="/audio/fountain.mp3" refDistance={FOUNTAIN.audioRefDistance} gain={2} />
       <mesh
         name="f_base"
         castShadow
@@ -164,4 +152,3 @@ export function Fountain(props: ThreeElements["group"]) {
   );
 }
 
-useGLTF.preload("/models/fountain.glb");

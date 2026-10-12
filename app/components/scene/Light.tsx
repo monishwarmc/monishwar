@@ -2,43 +2,55 @@
 
 import { useSettings } from "../settings/settings";
 
+/**
+ * The lighting rig.
+ *
+ * Four parts, each doing one job — change one without disturbing the others:
+ *
+ *   ambient     flat base so nothing is ever pure black
+ *   hemisphere  sky above, grass bounce below; this is what makes the lawn
+ *               read as green rather than as mud
+ *   key         the main light, warm and high, giving the avatar its shading
+ *   fill        cool and opposite the key, softening the shadow side
+ *   rim         low and behind, separating the avatar from the dark dome
+ *
+ * Everything scales with the Brightness setting, so the whole rig dims and
+ * lifts together instead of one light drowning the rest.
+ */
 const Light = () => {
   const { sceneBrightness } = useSettings();
+  const b = sceneBrightness;
 
   return (
     <>
-      {/*
-        A sky/ground fill on top of the directional rig below.
-        It is separate on purpose: the four directional lights are yours to
-        tune, and this only lifts the grass out of shadow. Set Brightness to 0
-        in Settings → Display to get exactly the rig without it.
-      */}
+      <ambientLight intensity={0.55 * b} color="#dbeafe" />
+
+      {/* Sky and bounce. The ground colour is sampled from the grass. */}
       <hemisphereLight
-        color="#cfeeff"
+        color="#d6f0ff"
         groundColor="#6f9c52"
-        intensity={1.1 * sceneBrightness}
+        intensity={1.5 * b}
       />
 
-      <ambientLight intensity={1} />
+      {/* Key: high and slightly to one side, like a sun through the dome. */}
       <directionalLight
-        position={[0, 0.5, -100]}
-        intensity={6}
-        color={"rgb(50, 168, 252)"}
+        position={[4, 9, 3]}
+        intensity={2.2 * b}
+        color="#fff6e8"
       />
+
+      {/* Fill: cool, opposite the key, lifting the shadow side. */}
       <directionalLight
-        position={[1, -6, 100]}
-        intensity={6}
-        color={"rgb(183, 220, 247)"}
+        position={[-5, 3, -4]}
+        intensity={1.0 * b}
+        color="#9ec9ff"
       />
+
+      {/* Rim: low and behind, so the avatar has an edge against the dark. */}
       <directionalLight
-        position={[-13, -1, -1]}
-        intensity={1}
-        color={"rgb(255, 255, 255)"}
-      />
-      <directionalLight
-        position={[13, -1, 1]}
-        intensity={1}
-        color={"rgb(218, 255, 253)"}
+        position={[0, 1.5, -8]}
+        intensity={1.3 * b}
+        color="#bfe6ff"
       />
     </>
   );

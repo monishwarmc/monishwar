@@ -10,6 +10,7 @@ const HINTS: { controls: ControlName[]; label: string; literal?: string[] }[] =
     { controls: ["autoRun"], label: "auto-run" },
     { controls: ["run"], label: "sprint" },
     { controls: ["jump"], label: "jump" },
+    { controls: ["interact"], label: "use / sit" },
     { controls: ["emote"], label: "emotes" },
     { controls: [], label: "orbit", literal: ["Drag"] },
     { controls: ["settings"], label: "settings" },

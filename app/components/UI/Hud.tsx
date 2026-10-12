@@ -7,20 +7,20 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import { ReactNode, useSyncExternalStore } from "react";
+import { press } from "../audio/sfx";
 import { useSession } from "../contexts/SessionContext";
 import { useIsTouch } from "../hooks/useIsTouch";
-import { tapFeedback, updateSettings, useSettings } from "../settings/settings";
-import Ambience from "../audio/Ambience";
+import { updateSettings, useSettings } from "../settings/settings";
 import Compass from "./Compass";
 import Controller from "./Controller";
 import EmoteWheel from "./EmoteWheel";
 import GlobalHotkeys from "./GlobalHotkeys";
-import HelpOverlay from "./HelpOverlay";
 import Intro from "./Intro";
+import Onboarding from "./guide/Onboarding";
 import LoadingScreen, { useSceneReady } from "./LoadingScreen";
 import RotateHint from "./RotateHint";
 import SettingsPanel from "./SettingsPanel";
-import ZonePrompt from "./ZonePrompt";
+import InteractPrompt from "./InteractPrompt";
 import {
   enterFullscreen,
   getFullscreenServerSnapshot,
@@ -50,7 +50,7 @@ const CornerButton = ({
       // Click, not pointerdown: these mount a panel where the finger is, and a
       // pointerdown handler would hand the tail of the same tap to it.
       onClick={() => {
-        tapFeedback();
+        press();
         onPress();
       }}
       style={{ opacity: hudOpacity }}
@@ -87,7 +87,7 @@ const VolumeButton = () => {
         type="button"
         aria-label="Volume down"
         onClick={() => {
-          tapFeedback();
+          press();
           stepDown();
         }}
         className="flex h-9 w-7 touch-none items-center justify-center rounded-full text-lg leading-none text-white/80 transition-colors hover:bg-white/10 active:scale-90"
@@ -100,7 +100,7 @@ const VolumeButton = () => {
         aria-label={silent ? "Unmute" : "Mute"}
         aria-pressed={silent}
         onClick={() => {
-          tapFeedback();
+          press();
           updateSettings({
             muted: !silent,
             masterVolume: silent && masterVolume <= 0 ? 0.5 : masterVolume,
@@ -121,7 +121,7 @@ const VolumeButton = () => {
         type="button"
         aria-label="Volume up"
         onClick={() => {
-          tapFeedback();
+          press();
           stepUp();
         }}
         className="flex h-9 w-7 touch-none items-center justify-center rounded-full text-lg leading-none text-white/80 transition-colors hover:bg-white/10 active:scale-90"
@@ -155,7 +155,6 @@ const Hud = () => {
   return (
     <div className="pointer-events-none absolute inset-0 z-10">
       <GlobalHotkeys />
-      <Ambience />
 
       {ready && (
         <div
@@ -178,9 +177,9 @@ const Hud = () => {
           {exploring && (
             <>
               <CornerButton
-                label="Help"
-                active={overlay === "help"}
-                onPress={() => toggleOverlay("help")}
+                label="How to play"
+                active={overlay === "guide"}
+                onPress={() => toggleOverlay("guide")}
               >
                 <HelpOutlinedIcon fontSize="small" />
               </CornerButton>
@@ -215,13 +214,13 @@ const Hud = () => {
         <>
           <Controller />
           <Compass />
-          <ZonePrompt />
+          <InteractPrompt />
           <RotateHint />
         </>
       )}
 
       <EmoteWheel />
-      <HelpOverlay />
+      <Onboarding />
       <SettingsPanel />
       <LoadingScreen />
     </div>

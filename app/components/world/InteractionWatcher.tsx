@@ -1,0 +1,86 @@
+"use client";
+
+import { useKeyboardControls } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo } from "react";
+import * as THREE from "three";
+import { ControlName } from "@/app/constants/controls.constants";
+import { playSfx } from "../audio/sfx";
+import { useSession } from "../contexts/SessionContext";
+import { useMonishwar } from "../contexts/MonishwarContext";
+import {
+  allInteractables,
+  getInteractionState,
+  resetInteractions,
+  setNearest,
+  toggleNearest,
+} from "./interactables";
+
+/**
+ * Finds the closest thing the avatar could use, and binds the interact key.
+ *
+ * One loop for every prop rather than one loop each: with a handful of
+ * interactables this is cheaper and, more importantly, it is the only place
+ * that decides *which* prop wins when two are in range.
+ */
+const InteractionWatcher = () => {
+  const [subscribeKeys] = useKeyboardControls<ControlName>();
+  const { exploring } = useSession();
+  const { ref: avatar } = useMonishwar();
+
+  const scratch = useMemo(
+    () => ({ prop: new THREE.Vector3(), player: new THREE.Vector3() }),
+    [],
+  );
+
+  useEffect(
+    () =>
+      subscribeKeys(
+        (state) => state.interact,
+        (pressed) => {
+          if (pressed) toggleNearest();
+        },
+      ),
+    [subscribeKeys],
+  );
+
+  useEffect(() => {
+    if (!exploring) resetInteractions();
+  }, [exploring]);
+
+  useFrame(() => {
+    const player = avatar.current;
+    if (!player || !exploring) return;
+
+    player.getWorldPosition(scratch.player);
+
+    let bestId: string | null = null;
+    let bestDistance = Infinity;
+
+    for (const item of allInteractables().values()) {
+      item.object.getWorldPosition(scratch.prop);
+
+      const distance = Math.hypot(
+        scratch.player.x - scratch.prop.x,
+        scratch.player.z - scratch.prop.z,
+      );
+
+      if (distance < item.radius && distance < bestDistance) {
+        bestDistance = distance;
+        bestId = item.id;
+      }
+    }
+
+    const { nearest, engaged } = getInteractionState();
+
+    if (bestId !== nearest) {
+      // A soft chime on arrival is the only cue that something is usable here.
+      if (bestId && !engaged) playSfx("chime", 0.35);
+      setNearest(bestId);
+    }
+  });
+
+  return null;
+};
+
+export default InteractionWatcher;

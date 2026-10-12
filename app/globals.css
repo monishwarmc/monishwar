@@ -72,3 +72,152 @@ input[type="range"],
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------------------------------- the guided tour */
+
+/*
+ * The tour shows each control being used instead of listing it, so these are
+ * the movements themselves — a thumb circling a stick, a finger sweeping the
+ * view, a keycap going down. Keyframes cannot be written inline, so every
+ * animation the guide needs lives here rather than being scattered across the
+ * components that play them.
+ *
+ * The reduced-motion rule further up collapses all of them to a still frame,
+ * which is why each one is readable at 0% as well as in motion.
+ */
+
+@keyframes guide-stick {
+  0%,
+  6% {
+    transform: translate(0, 0);
+  }
+  22% {
+    transform: translate(2px, -18px);
+  }
+  44% {
+    transform: translate(16px, 7px);
+  }
+  66% {
+    transform: translate(-16px, 7px);
+  }
+  86%,
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes guide-swipe {
+  0%,
+  8% {
+    transform: translateX(-30px) rotate(-6deg);
+  }
+  50% {
+    transform: translateX(30px) rotate(6deg);
+  }
+  92%,
+  100% {
+    transform: translateX(-30px) rotate(-6deg);
+  }
+}
+
+@keyframes guide-tap {
+  0%,
+  55%,
+  100% {
+    transform: translateY(-6px) scale(1);
+  }
+  68% {
+    transform: translateY(6px) scale(0.93);
+  }
+  80% {
+    transform: translateY(-6px) scale(1);
+  }
+}
+
+@keyframes guide-ripple {
+  0%,
+  62% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  70% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes guide-ring {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.14);
+    opacity: 0.9;
+  }
+}
+
+@keyframes guide-press {
+  0%,
+  22%,
+  100% {
+    transform: translateY(0);
+    border-color: rgb(255 255 255 / 0.35);
+    background-color: rgb(255 255 255 / 0.08);
+    color: rgb(255 255 255 / 0.8);
+  }
+  8%,
+  16% {
+    transform: translateY(3px);
+    border-color: rgb(110 231 183 / 0.9);
+    background-color: rgb(52 211 153 / 0.45);
+    color: rgb(255 255 255);
+  }
+}
+
+@keyframes guide-trace {
+  from {
+    stroke-dashoffset: 72;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.guide-stick {
+  animation: guide-stick 3.4s ease-in-out infinite;
+}
+
+.guide-swipe {
+  animation: guide-swipe 2.6s ease-in-out infinite;
+}
+
+.guide-tap {
+  animation: guide-tap 2s ease-in-out infinite;
+}
+
+.guide-ripple {
+  animation: guide-ripple 2s ease-out infinite;
+}
+
+.guide-ring {
+  animation: guide-ring 2.4s ease-in-out infinite;
+}
+
+.guide-press {
+  animation: guide-press 2.4s ease-in-out infinite;
+}
+
+.guide-trace {
+  stroke-dasharray: 6 6;
+  animation: guide-trace 1.4s linear infinite;
+}
+
+/* Keeps a white hand legible over grass, sky or the dark side of the ship. */
+.guide-hand {
+  filter: drop-shadow(0 2px 7px rgb(0 0 0 / 0.75));
+}

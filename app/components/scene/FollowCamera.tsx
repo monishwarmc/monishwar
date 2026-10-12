@@ -3,7 +3,11 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { FOLLOW_CAMERA, MOVEMENT, SPAWN } from "@/app/constants/controls.constants";
+import {
+  FOLLOW_CAMERA,
+  MOVEMENT,
+  SPAWN,
+} from "@/app/constants/controls.constants";
 import {
   addLook,
   addZoom,
@@ -14,7 +18,6 @@ import {
 import { publishHeading } from "../controls/heading";
 import { useMonishwar } from "../contexts/MonishwarContext";
 import { useSettings } from "../settings/settings";
-import { getFocusAnchor, useZoneState } from "../world/zoneState";
 
 /** Per-frame scratch space — see the note in CharacterController. */
 const scratch = {
@@ -22,47 +25,52 @@ const scratch = {
   target: new THREE.Vector3(),
   smoothTarget: new THREE.Vector3(),
   desired: new THREE.Vector3(),
-  focusCamera: new THREE.Vector3(),
-  focusTarget: new THREE.Vector3(),
 };
 
 /** Movement past this many pixels counts as a drag, not a tap. */
 const DRAG_THRESHOLD = 8;
 
-const dampFactor = (lambda: number, delta: number) =>
-  1 - Math.exp(-lambda * delta);
+/** Frame-rate independent exponential smoothing. */
+const damp = (lambda: number, delta: number) => 1 - Math.exp(-lambda * delta);
 
 /**
- * Over-the-shoulder camera for explore mode.
+ * The over-the-shoulder camera.
  *
- * Look input arrives from two places and is treated identically: the touch HUD
- * pushes deltas into the shared input state, and on pointer devices this
- * component listens for a drag on the canvas itself.
+ * Three jobs, in this order every frame:
+ *
+ *   1. turn   — yaw and pitch from whatever dragged, mouse or finger
+ *   2. place  — sit behind the avatar at the current distance
+ *   3. look   — aim at its shoulders, or higher when craning upwards
+ *
+ * All look input is handled right here on the canvas. An earlier version used
+ * a full-screen DOM layer for touch; it worked for looking but sat on top of
+ * the canvas and swallowed every tap, so nothing in the 3D scene could be
+ * clicked on a phone.
  */
 const FollowCamera = () => {
   const { ref } = useMonishwar();
   const camera = useThree((state) => state.camera);
   const domElement = useThree((state) => state.gl.domElement);
   const settings = useSettings();
-  const { focused } = useZoneState();
 
   const yaw = useRef(0);
   const pitch = useRef(0.3);
   const distance = useRef<number>(settings.cameraDistance);
-  const initialised = useRef(false);
+  const placed = useRef(false);
 
   // Seat the camera behind the spawn heading. Reading it from the avatar
   // instead would depend on whether the controller's placement effect has run
   // yet, and when it had not, "forward" came out backwards.
   useEffect(() => {
     yaw.current = SPAWN.yaw + Math.PI + MOVEMENT.modelFacingOffset;
-    initialised.current = false;
+    placed.current = false;
   }, [ref]);
 
-  // The slider is an absolute distance, so follow it when the player drags it.
   useEffect(() => {
     distance.current = settings.cameraDistance;
   }, [settings.cameraDistance]);
+
+  /* ------------------------------------------------------ pointer input */
 
   useEffect(() => {
     // Pointers currently down, so a two-finger pinch can be told from a drag.
@@ -141,6 +149,8 @@ const FollowCamera = () => {
     };
   }, [domElement]);
 
+  /* -------------------------------------------------------- frame loop */
+
   useFrame((_, rawDelta) => {
     const character = ref.current;
     if (!character) return;
@@ -148,36 +158,15 @@ const FollowCamera = () => {
     const delta = Math.min(rawDelta, 0.1);
     const smoothing = settings.cameraSmoothing;
 
-    // Reading a station: fly to its board and hold there. There is no DOM
-    // panel any more, so "opening" a station means framing it in 3D.
-    const anchor = focused ? getFocusAnchor(focused) : undefined;
-
-    if (anchor) {
-      scratch.focusCamera.copy(anchor.camera);
-      anchor.object.localToWorld(scratch.focusCamera);
-
-      scratch.focusTarget.copy(anchor.target);
-      anchor.object.localToWorld(scratch.focusTarget);
-
-      camera.position.lerp(
-        scratch.focusCamera,
-        dampFactor(5 * smoothing, delta),
-      );
-      scratch.smoothTarget.lerp(
-        scratch.focusTarget,
-        dampFactor(6 * smoothing, delta),
-      );
-      camera.lookAt(scratch.smoothTarget);
-      return;
-    }
+    /* 1. Turn ----------------------------------------------------------- */
 
     const look = consumeLook();
-    const sensitivity = FOLLOW_CAMERA.lookSensitivity * settings.lookSensitivity;
+    const sensitivity =
+      FOLLOW_CAMERA.lookSensitivity * settings.lookSensitivity;
 
     // Orbit the way OrbitControls and drei's CameraControls do, so explore
     // mode does not reverse the drag direction the idle view taught: both
-    // subtract the horizontal delta from the azimuth (dragging right swings
-    // the camera left, carrying the scene along with the finger).
+    // subtract the horizontal delta from the azimuth.
     yaw.current -= look.x * sensitivity * (settings.invertLookX ? -1 : 1);
 
     pitch.current = THREE.MathUtils.clamp(
@@ -192,13 +181,18 @@ const FollowCamera = () => {
       FOLLOW_CAMERA.maxDistance,
     );
 
+    /* 2. Place ----------------------------------------------------------- */
+
     character.getWorldPosition(scratch.character);
 
     scratch.target
       .copy(scratch.character)
-      .setY(
-        scratch.character.y + MOVEMENT.feetOffset + settings.cameraHeight,
-      );
+      .setY(scratch.character.y + MOVEMENT.feetOffset + settings.cameraHeight);
+
+    // Craning upwards should show the ship, not the back of the avatar's
+    // head, so the aim point rises as the lens drops below the shoulders.
+    const craning = Math.max(0, -pitch.current);
+    scratch.target.y += craning * 0.55 * distance.current;
 
     const horizontal = Math.cos(pitch.current) * distance.current;
 
@@ -214,11 +208,12 @@ const FollowCamera = () => {
 
     if (scratch.desired.y < floor) scratch.desired.y = floor;
 
-    if (!initialised.current) {
+    /* 3. Look ------------------------------------------------------------ */
+
+    if (!placed.current) {
       // Snap on the first frame instead of flying in from the orbit rig: the
-      // session should open with the avatar already close and framed, not as a
-      // speck the camera is still travelling towards.
-      initialised.current = true;
+      // session should open with the avatar already close and framed.
+      placed.current = true;
       scratch.smoothTarget.copy(scratch.target);
       camera.position.copy(scratch.desired);
       camera.lookAt(scratch.smoothTarget);
@@ -228,12 +223,12 @@ const FollowCamera = () => {
 
     camera.position.lerp(
       scratch.desired,
-      dampFactor(FOLLOW_CAMERA.positionLambda * smoothing, delta),
+      damp(FOLLOW_CAMERA.positionLambda * smoothing, delta),
     );
 
     scratch.smoothTarget.lerp(
       scratch.target,
-      dampFactor(FOLLOW_CAMERA.targetLambda * smoothing, delta),
+      damp(FOLLOW_CAMERA.targetLambda * smoothing, delta),
     );
 
     camera.lookAt(scratch.smoothTarget);

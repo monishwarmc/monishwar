@@ -10,6 +10,7 @@ import {
   FOLLOW_CAMERA,
   describeKey,
 } from "@/app/constants/controls.constants";
+import { press } from "../audio/sfx";
 import { useSession } from "../contexts/SessionContext";
 import { useMonishwar } from "../contexts/MonishwarContext";
 import { useIsTouch } from "../hooks/useIsTouch";
@@ -18,7 +19,6 @@ import {
   Quality,
   resetSettings,
   setBinding,
-  tapFeedback,
   updateSettings,
   useSettings,
 } from "../settings/settings";
@@ -488,7 +488,7 @@ const SettingsPanel = () => {
                       key={action}
                       type="button"
                       onClick={() => {
-                        tapFeedback();
+                        press();
                         startEmote();
                         setAnimation(action);
                       }}
@@ -513,7 +513,7 @@ const SettingsPanel = () => {
                       key={action}
                       type="button"
                       onClick={() => {
-                        tapFeedback();
+                        press();
                         startEmote();
                         setAnimation(action);
                       }}
@@ -632,7 +632,7 @@ const SettingsPanel = () => {
 
               <DangerButton
                 label="Show the control guide"
-                onPress={() => setOverlay("help")}
+                onPress={() => setOverlay("guide")}
               />
 
               {exploring && (

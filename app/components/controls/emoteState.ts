@@ -8,26 +8,12 @@
  */
 let active = false;
 
-const listeners = new Set<() => void>();
-const notify = () => listeners.forEach((listener) => listener());
-
 export const startEmote = () => {
-  if (active) return;
   active = true;
-  notify();
 };
 
 export const clearEmote = () => {
-  if (!active) return;
   active = false;
-  notify();
 };
 
 export const isEmoting = () => active;
-
-export const subscribeEmote = (listener: () => void) => {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-};

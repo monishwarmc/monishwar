@@ -27,8 +27,6 @@ export const registerObstacle = (id: string, obstacle: Obstacle) => {
   };
 };
 
-export const getObstacles = () => obstacles;
-
 const center = new THREE.Vector3();
 
 /**

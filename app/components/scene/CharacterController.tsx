@@ -4,38 +4,67 @@ import { useKeyboardControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { ControlName, MOVEMENT, SPAWN } from "@/app/constants/controls.constants";
+import {
+  ControlName,
+  MOVEMENT,
+  SPAWN,
+} from "@/app/constants/controls.constants";
 import { SCALE } from "@/app/constants/world.constants";
+import { playFootstep, playSfx } from "../audio/sfx";
+import { clearEmote, isEmoting } from "../controls/emoteState";
 import {
   consumeJump,
   inputState,
   queueJump,
   setAutoRun,
 } from "../controls/inputState";
-import { playSfx } from "../audio/sfx";
-import { clearEmote, isEmoting } from "../controls/emoteState";
 import { resolveObstacles } from "../controls/obstacles";
+import { getSeat, isSitting, standUp } from "../controls/sitState";
 import { useSession } from "../contexts/SessionContext";
-import { focusZone, getZoneState } from "../world/zoneState";
 import { ActionName, useMonishwar } from "../contexts/MonishwarContext";
+import { release } from "../world/interactables";
 import { useSettings } from "../settings/settings";
 
-type MoveState = "idle" | "walk" | "run";
+/* ------------------------------------------------------------- constants */
 
-const MOVE_ANIMATION: Record<MoveState, ActionName> = {
+/** Which clip plays for each way of being on your feet. */
+const MOVE_ANIMATION: Record<"idle" | "walk" | "run", ActionName> = {
   idle: "breathing_idle_standing",
   walk: "walking",
   run: "Running",
 };
 
+const SIT_ANIMATION: ActionName = "sitting_on_chair";
+
+/**
+ * Seconds between footfalls, per gait.
+ *
+ * Both clips are one in-place gait cycle — two steps — and run at their
+ * authored speed whatever the avatar's world speed is, so the cadence belongs
+ * to the clip and not to how fast the ground is going past. `walking` is
+ * 1.042s long and `Running` 0.667s; halve each for one step.
+ */
+const STEP_INTERVAL: Record<"walk" | "run", number> = {
+  walk: 1.042 / 2,
+  run: 0.667 / 2,
+};
+
+/**
+ * Where in the step the first footfall of a new gait lands.
+ *
+ * The clips start mid-stride, so starting the timer at zero put the first
+ * sound a beat behind the first visible footfall.
+ */
+const STEP_LEAD_IN = 0.72;
+
 const UP = new THREE.Vector3(0, 1, 0);
 const DOWN = new THREE.Vector3(0, -1, 0);
 
-/** Stick tilt past which "full tilt runs" kicks in. */
-const FULL_TILT = 0.85;
-
 /** Half-width of the avatar, used against obstacle circles. */
 const BODY_RADIUS = 0.012 * SCALE;
+
+/** Stick tilt past which "full tilt runs" kicks in. */
+const FULL_TILT = 0.85;
 
 /**
  * Per-frame scratch space. Module scope rather than `useMemo` because only one
@@ -59,9 +88,10 @@ const scratch = {
 
 scratch.raycaster.far = 1;
 
+/* --------------------------------------------------------------- helpers */
+
 /** Frame-rate independent exponential smoothing. */
-const dampFactor = (lambda: number, delta: number) =>
-  1 - Math.exp(-lambda * delta);
+const damp = (lambda: number, delta: number) => 1 - Math.exp(-lambda * delta);
 
 /** Shortest signed distance between two angles, in -PI..PI. */
 const angleDelta = (from: number, to: number) => {
@@ -69,14 +99,26 @@ const angleDelta = (from: number, to: number) => {
   return ((difference + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
 };
 
+/* ------------------------------------------------------------- component */
+
 /**
- * Drives the avatar from whichever input is live — keyboard on pointer
- * devices, the touch HUD on phones — and keeps it standing on the grass disc.
+ * Moves the avatar.
+ *
+ * The frame loop below runs in plain steps, in this order:
+ *
+ *   1. read input      — keyboard and the touch stick, merged
+ *   2. sitting?        — if seated, hold still and skip everything else
+ *   3. pick a speed    — walk, sprint or auto-run
+ *   4. steer           — relative to where the camera is looking
+ *   5. move and block  — obstacles, then the rim of the deck
+ *   6. jump and land   — a simple arc, no physics engine
+ *   7. stick to ground — a downward ray onto the grass
+ *   8. face and animate
  *
  * No physics engine is involved on purpose: the world group is animated every
  * frame (it bobs while idling), and rigid bodies do not follow an animated
- * parent transform. A downward raycast against the ground mesh gives the same
- * result here because the whole playfield is one flat disc.
+ * parent transform. A downward raycast gives the same result here because the
+ * whole playfield is one flat disc.
  */
 const CharacterController = () => {
   const { spaceshipRef, exploring } = useSession();
@@ -84,6 +126,8 @@ const CharacterController = () => {
   const [subscribeKeys, getKeys] = useKeyboardControls<ControlName>();
   const camera = useThree((state) => state.camera);
   const settings = useSettings();
+
+  /* --- edge-triggered keys ------------------------------------------- */
 
   // Jump and auto-run both toggle on the key's rising edge rather than being
   // sampled in the frame loop: a quick tap can fall entirely between two
@@ -110,24 +154,26 @@ const CharacterController = () => {
     [subscribeKeys],
   );
 
+  /* --- mutable state -------------------------------------------------- */
+
   const velocity = useRef(new THREE.Vector3());
   const airHeight = useRef(0);
   const airVelocity = useRef(0);
   const grounded = useRef(true);
-  const moveState = useRef<MoveState>("idle");
+  const moveState = useRef<"idle" | "walk" | "run">("idle");
+  const wasSitting = useRef(false);
+  const stepTimer = useRef(0);
   const yaw = useRef(0);
   const ground = useRef<THREE.Mesh | null>(null);
   const groundRadius = useRef(0);
-  const spawned = useRef(false);
+
+  /* --- spawn ----------------------------------------------------------- */
 
   // Drop the avatar on its mark each time explore mode starts, so the camera
-  // always opens on it from the same distance rather than wherever the last
+  // always opens on it from the same place rather than wherever the last
   // session left it.
   useEffect(() => {
-    if (!exploring) {
-      spawned.current = false;
-      return;
-    }
+    if (!exploring) return;
 
     const character = ref.current;
     if (!character) return;
@@ -137,7 +183,6 @@ const CharacterController = () => {
 
     yaw.current = SPAWN.yaw;
     velocity.current.set(0, 0, 0);
-    spawned.current = true;
   }, [exploring, ref]);
 
   /** Caches the grass mesh and its usable radius once the GLB is in the graph. */
@@ -172,6 +217,8 @@ const CharacterController = () => {
     const groundMesh = resolveGround();
     if (!groundMesh) return;
 
+    /* 1. Read input --------------------------------------------------- */
+
     const keys = getKeys();
 
     let inputX = 0;
@@ -188,16 +235,47 @@ const CharacterController = () => {
     let inputMagnitude = Math.min(Math.hypot(inputX, inputY), 1);
     const steering = inputMagnitude > 1e-4;
 
-    // Walking away from a station you are reading should just work, rather
-    // than leaving the camera parked on its board while the avatar leaves.
-    if (steering && getZoneState().focused) focusZone(null);
+    /* 2. Sitting ------------------------------------------------------- */
+
+    const seat = getSeat();
+
+    if (seat) {
+      // Any attempt to move gets out of the chair rather than dragging it.
+      if (steering) {
+        release();
+      } else {
+        // Park on the seat and hold the pose. The sitting clip raises the
+        // hips itself, so the root stays at floor height exactly as it does
+        // when standing — hence the same feet offset as the walking path.
+        scratch.local.copy(seat.seat);
+        scratch.local.y -= MOVEMENT.feetOffset;
+        parent.worldToLocal(scratch.local);
+        character.position.copy(scratch.local);
+        character.rotation.y = seat.facing;
+
+        yaw.current = seat.facing;
+        velocity.current.set(0, 0, 0);
+        wasSitting.current = true;
+
+        if (animation !== SIT_ANIMATION) setAnimation(SIT_ANIMATION);
+        return;
+      }
+    }
+
+    if (wasSitting.current) {
+      // Just stood up: force the idle clip so the sit pose does not stick.
+      wasSitting.current = false;
+      standUp();
+      moveState.current = "idle";
+      setAnimation(MOVE_ANIMATION.idle);
+    }
+
+    /* 3. Pick a speed -------------------------------------------------- */
 
     // An emote is a whole-body clip, so the legs are not being animated while
     // it plays. Steering cancels it; until then the avatar is rooted, which is
     // what stops it sliding across the grass in a standing pose.
-    const emoting = isEmoting();
-
-    if (emoting) {
+    if (isEmoting()) {
       if (steering) {
         clearEmote();
       } else {
@@ -209,8 +287,7 @@ const CharacterController = () => {
     }
 
     // Taking the stick or the arrow keys normally wins: it drops auto-run and
-    // hands the player a walk, which is the slower, more precise speed. The
-    // setting lets anyone who prefers it keep the pace while steering.
+    // hands the player a walk, which is the slower, more precise speed.
     if (steering && inputState.autoRun && settings.autoRunCancelsOnSteer) {
       setAutoRun(false);
     }
@@ -229,13 +306,12 @@ const CharacterController = () => {
       inputMagnitude = 1;
     }
 
-    const fullTilt =
-      settings.stickFullTiltRuns && inputMagnitude > FULL_TILT;
+    const fullTilt = settings.stickFullTiltRuns && inputMagnitude > FULL_TILT;
+    const running = autoRunning || fullTilt || (sprintHeld && steering);
+    const speed = running ? settings.runSpeed : settings.walkSpeed;
 
-    const running =
-      autoRunning || fullTilt || (sprintHeld && steering);
+    /* 4. Steer relative to the camera ---------------------------------- */
 
-    // Movement is relative to where the camera is looking, flattened to the disc.
     camera.getWorldDirection(scratch.forward);
     scratch.forward.setY(0);
 
@@ -253,23 +329,27 @@ const CharacterController = () => {
       scratch.move.normalize().multiplyScalar(inputMagnitude);
     }
 
-    const speed = running ? settings.runSpeed : settings.walkSpeed;
-
     scratch.target.copy(scratch.move).multiplyScalar(speed);
 
     const velocityVector = velocity.current;
-
-    velocityVector.lerp(
-      scratch.target,
-      dampFactor(MOVEMENT.acceleration, delta),
-    );
+    velocityVector.lerp(scratch.target, damp(MOVEMENT.acceleration, delta));
 
     if (velocityVector.lengthSq() < MOVEMENT.idleThreshold ** 2) {
       velocityVector.set(0, 0, 0);
     }
 
+    /* 5. Move, then block ---------------------------------------------- */
+
     character.getWorldPosition(scratch.position);
     scratch.next.copy(scratch.position).addScaledVector(velocityVector, delta);
+
+    // Slide around anything solid standing on the disc.
+    //
+    // Nothing is done to the velocity here on purpose. An earlier version cut
+    // it to 30% on any contact, which made running past a prop feel like
+    // wading. The push-out already removes the component heading into the
+    // obstacle; the component sliding along it should survive untouched.
+    resolveObstacles(scratch.next, scratch.position.y, BODY_RADIUS);
 
     // Keep the avatar on the grass rather than walking off into the glass.
     groundMesh.getWorldPosition(scratch.center);
@@ -287,20 +367,13 @@ const CharacterController = () => {
       velocityVector.multiplyScalar(0.2);
     }
 
-    // Slide around anything solid standing on the disc.
-    //
-    // Nothing is done to the velocity here on purpose. An earlier version cut
-    // it to 30% on any contact, which made running past a station feel like
-    // wading: brushing a shoulder against the plinth killed the sprint. The
-    // push-out below already removes the component heading into the obstacle,
-    // and the component sliding along it should survive untouched.
-    resolveObstacles(scratch.next, scratch.position.y, BODY_RADIUS);
+    /* 6. Jump and land -------------------------------------------------- */
 
-    // Jump — only from the floor, so it cannot be spammed mid-air. Draining
-    // the queue every frame also discards anything pressed before explore mode.
+    // Draining the queue every frame also discards anything pressed before
+    // explore mode started.
     const jumpRequested = consumeJump();
 
-    if (jumpRequested && grounded.current && exploring) {
+    if (jumpRequested && grounded.current && exploring && !isSitting()) {
       grounded.current = false;
       airVelocity.current = settings.jumpPower;
       playSfx("jump", 0.5);
@@ -321,7 +394,8 @@ const CharacterController = () => {
       }
     }
 
-    // Drop onto the terrain from just above the current head height.
+    /* 7. Stick to the ground -------------------------------------------- */
+
     scratch.origin.set(scratch.next.x, scratch.next.y + 0.3, scratch.next.z);
     scratch.raycaster.set(scratch.origin, DOWN);
 
@@ -340,7 +414,8 @@ const CharacterController = () => {
     parent.worldToLocal(scratch.local);
     character.position.copy(scratch.local);
 
-    // Face the direction of travel, expressed in the parent's frame.
+    /* 8. Face the way it is going, then pick a clip ---------------------- */
+
     if (velocityVector.lengthSq() > 1e-8) {
       parent.getWorldQuaternion(scratch.quaternion).invert();
 
@@ -353,32 +428,51 @@ const CharacterController = () => {
         Math.atan2(scratch.move.x, scratch.move.z) + MOVEMENT.modelFacingOffset;
 
       yaw.current +=
-        angleDelta(yaw.current, desiredYaw) *
-        dampFactor(settings.turnRate, delta);
+        angleDelta(yaw.current, desiredYaw) * damp(settings.turnRate, delta);
 
       character.rotation.y = yaw.current;
     }
 
-    // Animation: the jump clip owns the avatar until the feet are back down.
+    // The jump clip owns the avatar until the feet are back down.
     if (!grounded.current) return;
 
+    if (isEmoting()) {
+      moveState.current = "idle";
+      return;
+    }
+
     const planarSpeed = velocityVector.length();
-    const next: MoveState =
+    const next =
       planarSpeed > settings.runSpeed * MOVEMENT.runAnimationRatio
         ? "run"
         : planarSpeed > MOVEMENT.idleThreshold
           ? "walk"
           : "idle";
 
-    if (isEmoting()) {
-      // Leave the emote clip alone; the avatar is standing still for it.
-      moveState.current = "idle";
-      return;
+    /* 9. Footsteps ------------------------------------------------------ */
+
+    if (justLanded) {
+      playFootstep(0.5);
+      stepTimer.current = 0;
+    } else if (next === "idle") {
+      stepTimer.current = 0;
+    } else {
+      if (next !== moveState.current) {
+        stepTimer.current = STEP_INTERVAL[next] * STEP_LEAD_IN;
+      }
+
+      stepTimer.current += delta;
+
+      if (stepTimer.current >= STEP_INTERVAL[next]) {
+        stepTimer.current -= STEP_INTERVAL[next];
+        // A run lands harder than a walk, and that difference is most of what
+        // makes the two speeds audible as different things.
+        playFootstep(next === "run" ? 0.5 : 0.32);
+      }
     }
 
-    // Re-assert on every change, and whenever the avatar is moving but the
-    // mixer is still on some other clip — that is the case an emote leaves
-    // behind when movement cancels it.
+    // Re-assert whenever the avatar is moving but the mixer is on some other
+    // clip — that is what an emote leaves behind when movement cancels it.
     const stale = next !== "idle" && animation !== MOVE_ANIMATION[next];
 
     if (next !== moveState.current || justLanded || stale) {

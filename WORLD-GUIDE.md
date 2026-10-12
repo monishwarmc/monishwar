@@ -10,22 +10,38 @@ of it. Everything is under `app/`.
 `app/constants/world.constants.ts`
 
 ```ts
-export const AVATAR_SCALE = 0.045;   // ← raise this and the world grows
-export const SCALE = AVATAR_SCALE / 0.03;
+export const AVATAR_SCALE = 0.069;   // ← raise this and the world grows
+export const SCALE = AVATAR_SCALE / 0.039;
 ```
 
-Walk speed, jump height, camera distance, the fountain, and every station are
-multiplied by `SCALE`. If the scene ever feels too small or too big again,
-change `AVATAR_SCALE` and **nothing else**.
+Walk speed, jump height, camera distance, the fountain and the grass are all
+multiplied by `SCALE`. If the scene ever feels too small or too big, change
+`AVATAR_SCALE` and **nothing else**.
+
+Two different ways of saying a size live in that file, and mixing them up is
+the bug to watch for:
+
+| | Use it for | Example |
+|---|---|---|
+| `0.03 * SCALE` | scenery with no real-world size — blades of grass, the fountain | `0.0082 * SCALE` tall grass |
+| `metres(0.45)` | anything the avatar walks up to, sits on or reads | the sofa's cushion, the control board |
+
+Prefer `metres()`. The board on the deck was written the other way and drifted
+into a seven-metre billboard floating three-quarters of a metre off the grass,
+because nothing in "design units" ever says out loud how big it really is.
+
+The avatar model is 1.77 units tall and is a 1.77m person, so **one model unit
+is one metre** and `metres(x)` is just `x * AVATAR_SCALE`. One world unit works
+out at about 14.5 metres, which makes the grass disc a ~23m plaza.
 
 Other things worth knowing there:
 
 | Constant | What it does |
 |---|---|
-| `RING_RADIUS` | how far the six stations sit from the fountain |
-| `DECK_RADIUS` | how far you can walk before the edge stops you |
+| `RING_RADIUS` | where the worn paths in the grass run |
 | `GROUND_Y` | height of the grass (fixed by the spaceship model) |
-| `PIXELS_TO_WORLD` | how a CSS-pixel screen shrinks into world space |
+| `FOUNTAIN` | its scale, its collision radius and how far the water carries |
+| `SOFA_MODEL` / `AVATAR_SIT` / `SOFA_FIT` | see "Sitting on things" below |
 
 ---
 
@@ -36,80 +52,93 @@ app/
   constants/          numbers you tune — world sizes, key bindings, your CV
   components/
     world/            everything inside the dome
-      zones.ts          the six stations: position, colour, footprint
-      Station.tsx       shared shell (sign, footprint, proximity, focus)
-      parts.tsx         3D widgets: Button3D, HoloText, HoloBoard, LogoPlate
-      skills.ts         maps your skills to logo PNGs
-      stations/         ONE FILE PER STATION  ← most edits happen here
-      GrassField.tsx    instanced wind grass
-    scene/            camera, character controller, lighting, render budget
-    controls/         input plumbing (stick, keys, obstacles, emotes)
-    UI/               the 2D overlay — HUD, settings, help, loading
-    audio/            ambient bed + sound effects
-    ai/               the Gemini seam (not connected yet)
+      GrassField.tsx    instanced wind grass, parted by the avatar
+      parts.tsx         shared 3D bits: HoloText and the metal materials
+      interactables.ts  the registry of things you can walk up to and use
+      useInteractable.ts  one hook that registers a prop as usable
+      InteractionWatcher.tsx  picks the nearest one, every frame
+      props/            ONE FILE PER PROP  ← most edits happen here
+    models/           the GLB wrappers (avatar, ship, fountain, sofa)
+    scene/            camera, character controller, head tracking, lighting
+    controls/         input plumbing (stick, keys, obstacles, emotes, sitting)
+    audio/            the fountain's loop, the sound effects, the listener
+    UI/               the 2D overlay — HUD, settings, loading
+      guide/            the first-run tour
+    settings/         every player-tunable value, persisted to localStorage
+    loading/          the asset manifest behind the loading screen
 ```
 
 ---
 
-## Changing a station
+## Adding something you can walk up to and use
 
-Each station is a single file in `app/components/world/stations/`. They all
-look the same:
-
-```tsx
-<Station
-  zone={zoneById("projects")}
-  signHeight={0.215}          // where the floating name sits
-  focusCamera={[0, 0.115, 0.3]}  // where the camera goes when you press E
-  focusTarget={[0, 0.115, 0]}    // what it looks at
->
-  ...geometry...
-</Station>
-```
-
-Inside a station, **+Z points at the fountain** — that is the side the visitor
-walks up from, so put the readable face at positive Z.
-
-Sizes are written in "design units" and multiplied by `SCALE`. Copy the pattern:
+One hook does the whole job — proximity, the prompt, the key binding and the
+collision circle:
 
 ```tsx
-<boxGeometry args={[0.1 * SCALE, 0.07 * SCALE, 0.004 * SCALE]} />
+const group = useRef<THREE.Group>(null);
+
+useInteractable({
+  ref: group,
+  id: "bench",
+  label: "Bench",
+  verb: "Sit",
+  radius: metres(2.6),    // how close counts
+  collision: metres(0.4), // omit to make it walk-through
+  onEngage: () => { … },
+  onRelease: () => { … },
+});
 ```
 
-### Adding a seventh station
-
-1. Add an entry to `ZONES` in `world/zones.ts` (id, title, angle, colour,
-   range, collision).
-2. Add the id to the `ZoneId` union in the same file.
-3. Write `world/stations/YourStation.tsx` wrapping everything in `<Station>`.
-4. Export it from `world/stations/index.ts`.
-5. Render it in `scene/World.tsx`.
+Then render it in `scene/World.tsx`. `SofaSpot.tsx` is the worked example.
 
 ---
 
-## The 3D widgets
+## Sitting on things
 
-From `world/parts.tsx`:
+The avatar's `sitting_on_chair` clip is not negotiable, and everything about
+the sofa follows from it:
 
-- **`<HoloText>`** — text. `onTop` draws it over everything (used for station
-  names so they never get buried in the geometry as the camera turns).
-- **`<Button3D>`** — a pressable control. Already handles the case where you
-  finish a camera drag on top of it, which would otherwise count as a click.
-- **`<HoloBoard>`** — a translucent panel with a lit rim.
-- **`<LogoPlate>`** — an image on a plane (skills, employers, issuers).
-- **`<ScanBeam>`** — the ring of light that travels up a structure.
+- it leaves the root standing on the floor and raises the hips itself
+- the hips end **0.465m up** and **0.403m behind** the root
+
+So the cushion has to arrive just under 0.465m or the avatar floats above it or
+sinks through it, and the avatar has to be stood 0.403m *in front of* the
+cushion for the hips to land on it. `SOFA_FIT` in `world.constants.ts` solves
+that for the scale of the sofa, from measurements taken out of the GLB; the
+numbers are written down next to it so they are checkable.
+
+If you add a chair, measure where its seat is in model units and do the same.
+
+---
+
+## The grass
+
+One instanced draw call, and everything that moves in it moves in the vertex
+shader — wind, and the avatar parting it as it walks. Two uniforms do the
+second part: where the feet are, and where they were a moment ago, which is
+what makes blades spring back up *behind* you rather than the instant you pass.
+
+Density is `BASE_TUFTS` per quality level, times the player's own
+**Settings → Display → Grass density**.
+
+---
+
+## The first-run tour
+
+`app/components/UI/guide/` — a card plus a gesture animated over the control it
+is teaching, and a step only completes when the player actually does the thing.
+It never blocks input, which is the point.
+
+To add a step: add an entry to the device's list in `Onboarding.tsx` with its
+copy, where on screen the demonstration plays, and which gesture from
+`Gestures.tsx` to play. Then say how to detect it in the watcher loop.
 
 ---
 
 ## Your content
 
-All of it comes from `app/constants/portfolio.constants.ts`. Add a project
-there and the TV gains a channel; add a certification and the kiosk gains a
-page. Nothing else needs touching.
-
-The only extra step is **skills**: if a new skill has a logo, add one line to
-`world/skills.ts` mapping its name to a file in `public/skills/`. Skills
-without a logo still grow on the tree, just as a labelled orb.
+All of it comes from `app/constants/portfolio.constants.ts`.
 
 ---
 
@@ -118,31 +147,23 @@ without a logo still grow on the tree, just as a labelled orb.
 | What | Where | How |
 |---|---|---|
 | Emote icons | `public/emotes/*.png` | your avatar rendered headlessly in each pose |
-| Skill logos | `public/skills/*.png` | simple-icons (CC0) rasterised to white marks |
-| Ambient music | `public/audio/ambient.mp3` | synthesised with numpy — detuned pad + bells |
-| UI sounds | `public/audio/{click,open,close,chime,jump}.mp3` | synthesised the same way |
+| UI sounds | `public/audio/{click,open,close,chime,jump}.mp3` | synthesised with numpy |
+| Footsteps | `public/audio/step{1..4}.mp3` | band-passed noise bursts over a low thump |
+| Fountain loop | `public/audio/fountain.mp3` | rebuilt with a 1.5s equal-power crossfade of its tail over its head, so it loops without a seam |
 
 ---
 
-## Wiring up Gemini
+## Audio, and the one trap in it
 
-`app/components/ai/guide.ts` is the whole seam. It already:
+A compressed file does not decode to exactly what was encoded: the encoder pads
+both ends and `decodeAudioData` hands that padding back as silence. A looping
+sound therefore has a hole in it however gapless the file is, which is why
+`audio/AmbientLoop.tsx` sets `loopStart`/`loopEnd` to trim it — and why it does
+not use drei's `<PositionalAudio>`, which starts the buffer source itself and
+leaves no chance to.
 
-- builds the grounding context from your CV (`buildContext()`)
-- has the system prompt (`GUIDE_SYSTEM_PROMPT`)
-- defines what the avatar can *do* with an answer (`GuideAction`) — walk the
-  camera to a station, or play an emote
-- carries out that action (`performGuideAction`)
-
-To connect it:
-
-1. Make `app/api/guide/route.ts`, a POST handler that takes
-   `{ question, context }` and calls Gemini **server-side** so your API key
-   never reaches the browser.
-2. Replace the body of `askGuide()` with a `fetch("/api/guide", …)`.
-
-That is it — the avatar already knows how to act on a reply, and
-`focusZone(id)` already moves the camera to any station by name.
+Nothing is audible until a user gesture starts the AudioContext;
+`audio/listener.ts` does that from the "Begin exploring" press.
 
 ---
 
@@ -154,9 +175,8 @@ The laptop-heat levers, all in Settings → Display:
 - **Render resolution** — caps the pixel ratio.
 - **Grass density** — the field is one instanced draw call, but blades still cost.
 
-Rendering stops entirely when the tab is hidden
-(`scene/RenderGovernor.tsx`).
+Rendering stops entirely when the tab is hidden (`scene/RenderGovernor.tsx`).
 
-The one thing still worth doing: `public/models/portfolio_world.glb` (19MB) and
+The one thing still worth doing: `public/models/portfolio_world.glb` (18MB) and
 `monishwar.glb` (14MB) are uncompressed. `gltf-transform optimize` on those two
-would typically take 33MB down to 3–5MB and is the single biggest win left.
+would typically take 32MB down to 3–5MB and is the single biggest win left.

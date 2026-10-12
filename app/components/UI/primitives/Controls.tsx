@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { tapFeedback } from "../../settings/settings";
+import { press } from "../../audio/sfx";
 
 /**
  * Shared chrome for the HUD and the settings panel.
@@ -50,7 +50,7 @@ export const HudButton = ({
       trigger === "press"
         ? (event) => {
             event.preventDefault();
-            tapFeedback();
+            press();
             onPress();
           }
         : undefined
@@ -58,7 +58,7 @@ export const HudButton = ({
     onClick={
       trigger === "click"
         ? () => {
-            tapFeedback();
+            press();
             onPress();
           }
         : undefined
@@ -132,7 +132,7 @@ export const Toggle = ({
     role="switch"
     aria-checked={value}
     onClick={() => {
-      tapFeedback();
+      press();
       onChange(!value);
     }}
     className="flex w-full items-center justify-between gap-4 py-2.5 text-left"
@@ -174,7 +174,7 @@ export const Segmented = <T extends string>({
           key={option.value}
           type="button"
           onClick={() => {
-            tapFeedback();
+            press();
             onChange(option.value);
           }}
           className={`flex-1 rounded-lg px-2 py-2 text-xs font-medium transition-colors ${
@@ -215,7 +215,7 @@ export const DangerButton = ({
   <button
     type="button"
     onClick={() => {
-      tapFeedback();
+      press();
       onPress();
     }}
     className="mt-2 w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white/85 transition-colors hover:border-white/40 hover:bg-white/10 active:scale-[0.98]"

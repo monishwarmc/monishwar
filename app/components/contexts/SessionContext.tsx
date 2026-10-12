@@ -13,11 +13,11 @@ import React, {
 import * as THREE from "three";
 import { resetInput } from "../controls/inputState";
 import { clearEmote } from "../controls/emoteState";
-import { focusZone } from "../world/zoneState";
+import { resetInteractions } from "../world/interactables";
 import { getSettings } from "../settings/settings";
 
 /** Only one full-screen overlay may be open at a time. */
-export type Overlay = "none" | "emotes" | "settings" | "help";
+export type Overlay = "none" | "emotes" | "settings" | "guide";
 
 interface Session {
   /** The spaceship group, so the controller can find the ground mesh in it. */
@@ -40,14 +40,38 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const camRef = useRef<CameraControlsImpl>(null!);
 
   const [exploring, setExploring] = useState(false);
-  const [overlay, setOverlay] = useState<Overlay>("none");
+  const [current, setCurrent] = useState<Overlay>("none");
+
+  /**
+   * Opening a panel also stands the avatar up, because an overlay covers the
+   * screen and leaving it sitting on the sofa underneath left a live prompt
+   * behind the panel.
+   *
+   * That has to happen *here*, in the handler, and not inside a `setCurrent`
+   * updater — which is where it used to live. React is free to call an updater
+   * during a render, and `resetInteractions` publishes to an external store, so
+   * the store woke `InteractPrompt` up in the middle of rendering this
+   * provider. Every route to an overlay goes through this one function so the
+   * rule only has to hold in one place.
+   */
+  const setOverlay = useCallback((next: Overlay) => {
+    if (next !== "none") resetInteractions();
+    setCurrent(next);
+  }, []);
+
+  const toggleOverlay = useCallback(
+    (next: Exclude<Overlay, "none">) => {
+      setOverlay(current === next ? "none" : next);
+    },
+    [current, setOverlay],
+  );
 
   const startExploring = useCallback(() => {
     setExploring(true);
-    // The control guide is the first thing a new visitor needs; it is opt-out,
+    // The guided tour is the first thing a new visitor needs; it is opt-out,
     // and the setting survives a reload.
-    setOverlay(getSettings().showHelpOnStart ? "help" : "none");
-  }, []);
+    setOverlay(getSettings().showHelpOnStart ? "guide" : "none");
+  }, [setOverlay]);
 
   const stopExploring = useCallback(() => {
     setExploring(false);
@@ -55,16 +79,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     clearEmote();
     // Dropping the HUD mid-press would otherwise leave the stick stuck on.
     resetInput();
-  }, []);
-
-  const toggleOverlay = useCallback((next: Exclude<Overlay, "none">) => {
-    setOverlay((current) => {
-      const target = current === next ? "none" : next;
-      // Never leave the camera parked at a station under a HUD overlay.
-      if (target !== "none") focusZone(null);
-      return target;
-    });
-  }, []);
+  }, [setOverlay]);
 
   const value = useMemo(
     () => ({
@@ -73,11 +88,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       exploring,
       startExploring,
       stopExploring,
-      overlay,
+      overlay: current,
       setOverlay,
       toggleOverlay,
     }),
-    [exploring, overlay, startExploring, stopExploring, toggleOverlay],
+    [exploring, current, startExploring, stopExploring, setOverlay, toggleOverlay],
   );
 
   return (

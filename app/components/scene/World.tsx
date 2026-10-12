@@ -8,15 +8,9 @@ import { Spaceship } from "../models/Spaceship";
 import { Fountain } from "../models/Fountain";
 import { useSession } from "../contexts/SessionContext";
 import GrassField from "../world/GrassField";
-import ZoneWatcher from "../world/ZoneWatcher";
-import {
-  AboutPillar,
-  CertificationKiosk,
-  ContactTower,
-  ProjectTheatre,
-  SkillTree,
-  TimelineWalk,
-} from "../world/stations";
+import InteractionWatcher from "../world/InteractionWatcher";
+import ControlBoard from "../world/props/ControlBoard";
+import SofaSpot from "../world/props/SofaSpot";
 
 /** How fast the idle drift settles once the player takes control. */
 const SETTLE_RATE = 3;
@@ -64,16 +58,12 @@ const World = () => {
       <GrassField />
       <Fountain />
 
-      {/* The six stations, arranged on a ring around the fountain. */}
-      <AboutPillar />
-      <SkillTree />
-      <TimelineWalk />
-      <ProjectTheatre />
-      <CertificationKiosk />
-      <ContactTower />
+      {/* Props. Add new ones here — see world/useInteractable.ts. */}
+      <ControlBoard />
+      <SofaSpot />
 
       <Monishwar />
-      <ZoneWatcher />
+      <InteractionWatcher />
     </group>
   );
 };

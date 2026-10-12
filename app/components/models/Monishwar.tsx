@@ -4,7 +4,6 @@ import { ThreeElements, useFrame, useGraph } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import { SkeletonUtils } from "three-stdlib";
 import { useMonishwar } from "../contexts/MonishwarContext";
-import { Sofa } from "./Sofa";
 import { GLTFResult } from "../../types/GLTFresult";
 import { createIdle } from "../animations/Animations";
 import { AVATAR_SCALE, GROUND_Y } from "@/app/constants/world.constants";
@@ -173,9 +172,6 @@ export function Monishwar({ animationSpeedRef, ...props }: MonishwarProps) {
     <group ref={ref} {...props} dispose={null}>
       <group name="Scene" position={[0, GROUND_Y, 0]} scale={AVATAR_SCALE}>
         <group name="Armature" rotation={[0, 0, 0]}>
-          {animation == "sitting_on_chair" && (
-            <Sofa position={[0, 0.6, 0]} scale={0.6} />
-          )}
           <primitive
             object={nodes.Hips}
             name="Hips"
@@ -655,4 +651,3 @@ export function Monishwar({ animationSpeedRef, ...props }: MonishwarProps) {
   );
 }
 
-useGLTF.preload("/models/monishwar.glb");

@@ -114,8 +114,14 @@ export const FOLLOW_CAMERA = {
   maxDistance: 0.55 * SCALE,
   /** Height above the feet that the camera aims at — roughly the shoulders. */
   lookHeight: 0.034 * SCALE,
-  minPitch: -0.3,
-  maxPitch: 1.15,
+  /**
+   * Pitch is the camera's elevation above the avatar. A strongly negative
+   * value drops the lens low and tips it up, which is what lets you see the
+   * whole dome and the top of the ship from the deck. The ground clearance
+   * below stops it going through the grass.
+   */
+  minPitch: -1.0,
+  maxPitch: 1.25,
   /** Radians of yaw per pixel dragged. */
   lookSensitivity: 0.005,
   /** Thumbs travel shorter distances than a mouse, so touch deltas get a boost. */

@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { QUALITY_PIXEL_RATIO, useSettings } from "../settings/settings";
 import Camera from "./Camera";
 import CharacterController from "./CharacterController";
+import HeadTracking from "./HeadTracking";
 import Light from "./Light";
 import RenderGovernor from "./RenderGovernor";
 import World from "./World";
@@ -37,6 +38,7 @@ const Experience = () => {
         <Camera />
         <World />
         <CharacterController />
+        <HeadTracking />
       </Suspense>
     </Canvas>
   );

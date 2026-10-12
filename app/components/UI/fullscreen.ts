@@ -15,7 +15,7 @@ type FullscreenDocument = Document & {
   webkitExitFullscreen?: () => Promise<void> | void;
 };
 
-export const getFullscreenElement = () => {
+const getFullscreenElement = () => {
   const doc = document as FullscreenDocument;
   return doc.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
 };
@@ -55,7 +55,7 @@ export const enterFullscreen = async () => {
   }
 };
 
-export const exitFullscreen = async () => {
+const exitFullscreen = async () => {
   try {
     const orientation = screen.orientation as LockableOrientation | undefined;
     orientation?.unlock?.();

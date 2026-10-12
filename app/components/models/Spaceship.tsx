@@ -89,4 +89,3 @@ export function Spaceship(props: ThreeElements["group"]) {
   );
 }
 
-useGLTF.preload("/models/portfolio_world.glb");

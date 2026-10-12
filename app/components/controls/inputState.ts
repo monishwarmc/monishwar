@@ -28,6 +28,14 @@ export const inputState = {
    * press it.
    */
   dragged: false,
+  /**
+   * Jumps asked for since the page loaded.
+   *
+   * A counter rather than a flag because `jumpQueued` is drained inside the
+   * render loop: anything watching from the DOM — the guide, which waits for
+   * the player to actually try a jump — would miss every one of them.
+   */
+  jumpCount: 0,
 };
 
 /**
@@ -67,10 +75,8 @@ export const resetInput = () => {
 
 export const queueJump = () => {
   inputState.jumpQueued = true;
+  inputState.jumpCount += 1;
 };
-
-/** Set by the controller so the HUD and the scene can react to a landing. */
-export const JUMP_SOUND_GAIN = 0.5;
 
 /** Returns true once per queued jump. */
 export const consumeJump = () => {

@@ -40,3 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+
+# Refact.ai assistant state — local scratch, not source. Left on disk, just
+# not versioned: it rewrites itself on every session and buried every real
+# diff under forty files of churn.
+/.refact/

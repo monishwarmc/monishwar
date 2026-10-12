@@ -4,11 +4,12 @@ import Image from "next/image";
 
 import CloseIcon from "@mui/icons-material/Close";
 import { useEffect, useState } from "react";
+import { press } from "../audio/sfx";
 import { startEmote } from "../controls/emoteState";
 import { setAutoRun } from "../controls/inputState";
 import { useSession } from "../contexts/SessionContext";
 import { ActionName, useMonishwar } from "../contexts/MonishwarContext";
-import { tapFeedback, useSettings } from "../settings/settings";
+import { useSettings } from "../settings/settings";
 import { EMOTES } from "./emotes";
 
 /**
@@ -48,7 +49,7 @@ const EmoteWheel = () => {
   if (!open) return null;
 
   const pick = (action: ActionName) => {
-    tapFeedback();
+    press();
     // An emote roots the avatar, so it cannot sit on top of an auto-run.
     setAutoRun(false);
     startEmote();
@@ -126,7 +127,7 @@ const EmoteWheel = () => {
           type="button"
           aria-label="Close emotes"
           onClick={() => {
-            tapFeedback();
+            press();
             setOverlay("none");
           }}
           style={{ height: buttonSize, width: buttonSize }}

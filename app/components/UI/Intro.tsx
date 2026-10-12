@@ -2,6 +2,8 @@
 
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import { PERSONAL_INFO } from "@/app/constants/portfolio.constants";
+import { primeSfx } from "../audio/sfx";
+import { resumeAudio } from "../audio/listener";
 import { useSession } from "../contexts/SessionContext";
 import { useIsTouch } from "../hooks/useIsTouch";
 import { enterFullscreen } from "./fullscreen";
@@ -16,11 +18,19 @@ const Intro = () => {
   const isTouch = useIsTouch();
   const ready = useSceneReady();
 
-  if (exploring) return null;
+  // Hidden until the world is ready: there is nothing to introduce yet, and
+  // it used to paint over the loading screen.
+  if (exploring || !ready) return null;
 
   const start = () => {
+    // This press is the user gesture that fullscreen, the orientation lock and
+    // — the easiest of the three to forget — the audio clock all need. Every
+    // browser opens an AudioContext suspended, so without this the fountain is
+    // playing to nobody and the first footstep is swallowed.
+    resumeAudio();
+    primeSfx();
+
     startExploring();
-    // This press is the user gesture fullscreen and orientation lock need.
     if (isTouch) void enterFullscreen();
   };
 
@@ -38,11 +48,11 @@ const Intro = () => {
       <button
         type="button"
         onClick={start}
-        disabled={!ready}
-        className="pointer-events-auto flex touch-none items-center gap-2.5 rounded-full bg-white px-6 py-3.5 text-sm font-semibold tracking-wide text-black shadow-[0_8px_30px_rgba(0,0,0,0.5)] transition-transform duration-200 hover:scale-105 active:scale-95 disabled:cursor-wait disabled:opacity-40 sm:text-base"
+
+        className="pointer-events-auto flex touch-none items-center gap-2.5 rounded-full bg-white px-6 py-3.5 text-sm font-semibold tracking-wide text-black shadow-[0_8px_30px_rgba(0,0,0,0.5)] transition-transform duration-200 hover:scale-105 active:scale-95 sm:text-base"
       >
         <SportsEsportsIcon fontSize="small" />
-        {ready ? "Begin exploring" : "Preparing world…"}
+        Begin exploring
       </button>
 
       <p className="text-[11px] text-white/45">
