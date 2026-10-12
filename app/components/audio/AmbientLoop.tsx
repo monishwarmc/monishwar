@@ -4,7 +4,7 @@ import { useLoader, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useSettings } from "../settings/settings";
-import { getListener } from "./listener";
+import { attachListener, getListener } from "./listener";
 
 /**
  * A sound that plays forever from a point in the world.
@@ -58,14 +58,7 @@ const AmbientLoop = ({ url, refDistance, gain = 1 }: AmbientLoopProps) => {
 
   // The listener rides the camera, so the fountain is quiet from across the
   // deck and loud when the avatar is standing in it.
-  useEffect(() => {
-    const listener = getListener();
-    camera.add(listener);
-
-    return () => {
-      camera.remove(listener);
-    };
-  }, [camera]);
+  useEffect(() => attachListener(camera), [camera]);
 
   useEffect(() => {
     const audio = audioRef.current;

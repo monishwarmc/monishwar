@@ -20,6 +20,7 @@ import Onboarding from "./guide/Onboarding";
 import LoadingScreen, { useSceneReady } from "./LoadingScreen";
 import RotateHint from "./RotateHint";
 import SettingsPanel from "./SettingsPanel";
+import SkillsPanel from "./SkillsPanel";
 import InteractPrompt from "./InteractPrompt";
 import {
   enterFullscreen,
@@ -222,6 +223,7 @@ const Hud = () => {
       <EmoteWheel />
       <Onboarding />
       <SettingsPanel />
+      <SkillsPanel />
       <LoadingScreen />
     </div>
   );

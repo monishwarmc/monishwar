@@ -10,6 +10,7 @@ import { useSession } from "../contexts/SessionContext";
 import GrassField from "../world/GrassField";
 import InteractionWatcher from "../world/InteractionWatcher";
 import ControlBoard from "../world/props/ControlBoard";
+import SkillTree from "../world/props/SkillTree";
 import SofaSpot from "../world/props/SofaSpot";
 
 /** How fast the idle drift settles once the player takes control. */
@@ -61,6 +62,7 @@ const World = () => {
       {/* Props. Add new ones here — see world/useInteractable.ts. */}
       <ControlBoard />
       <SofaSpot />
+      <SkillTree />
 
       <Monishwar />
       <InteractionWatcher />

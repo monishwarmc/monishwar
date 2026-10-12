@@ -5,6 +5,7 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { MOVEMENT } from "@/app/constants/controls.constants";
 import { useMonishwar } from "../contexts/MonishwarContext";
+import { makeRandom } from "./random";
 import { useSettings } from "../settings/settings";
 import { RING_RADIUS, SCALE } from "@/app/constants/world.constants";
 
@@ -12,18 +13,6 @@ import { RING_RADIUS, SCALE } from "@/app/constants/world.constants";
 const FIELD_RADIUS = 1.6;
 /** Clear ground around the fountain so blades do not grow through the basin. */
 const FOUNTAIN_CLEAR = 0.09;
-
-/**
- * A deterministic generator, at module scope so the field is identical between
- * reloads and the closure does not reassign anything the component owns.
- */
-const makeRandom = (seed: number) => {
-  let state = seed;
-  return () => {
-    state = (state * 1664525 + 1013904223) % 4294967296;
-    return state / 4294967296;
-  };
-};
 
 /** Tufts, not blades — each one plants BLADES_PER_TUFT of them. */
 const BASE_TUFTS: Record<string, number> = {

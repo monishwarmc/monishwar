@@ -16,6 +16,7 @@ import { installAssetLog } from "./assetLog";
 export const MODELS = [
   "/models/portfolio_world.glb",
   "/models/monishwar.glb",
+  "/models/tree.glb",
   "/models/fountain.glb",
   "/models/sofa.glb",
 ] as const;
