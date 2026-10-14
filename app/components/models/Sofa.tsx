@@ -7,6 +7,7 @@ import {
   SOFA_FIT,
   SOFA_MODEL,
 } from "@/app/constants/world.constants";
+import { MODEL_URLS } from "@/app/constants/models.generated";
 
 type GLTFResult = GLTF & {
   nodes: {
@@ -37,7 +38,7 @@ type GLTFResult = GLTF & {
  */
 export function Sofa(props: ThreeElements["group"]) {
   const { nodes, materials } = useGLTF(
-    "/models/sofa.glb",
+    MODEL_URLS.sofa,
   ) as unknown as GLTFResult;
 
   return (

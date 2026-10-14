@@ -2,14 +2,14 @@
 
 import { useKeyboardControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import {
   ControlName,
   MOVEMENT,
   SPAWN,
 } from "@/app/constants/controls.constants";
-import { SCALE } from "@/app/constants/world.constants";
+import { AVATAR_BODY, DECK } from "@/app/constants/world.constants";
 import { playFootstep, playSfx } from "../audio/sfx";
 import { clearEmote, isEmoting } from "../controls/emoteState";
 import {
@@ -18,8 +18,8 @@ import {
   queueJump,
   setAutoRun,
 } from "../controls/inputState";
-import { resolveObstacles } from "../controls/obstacles";
 import { getSeat, isSitting, standUp } from "../controls/sitState";
+import { useCharacterBody } from "../physics/useCharacterBody";
 import { useSession } from "../contexts/SessionContext";
 import { ActionName, useMonishwar } from "../contexts/MonishwarContext";
 import { release } from "../world/interactables";
@@ -58,13 +58,46 @@ const STEP_INTERVAL: Record<"walk" | "run", number> = {
 const STEP_LEAD_IN = 0.72;
 
 const UP = new THREE.Vector3(0, 1, 0);
-const DOWN = new THREE.Vector3(0, -1, 0);
-
-/** Half-width of the avatar, used against obstacle circles. */
-const BODY_RADIUS = 0.012 * SCALE;
 
 /** Stick tilt past which "full tilt runs" kicks in. */
 const FULL_TILT = 0.85;
+
+/**
+ * Where the avatar's root sits when it is standing on the grass.
+ *
+ * Its own inner group is `feetOffset` above it, so the root has to be that far
+ * under the surface for the feet to be on it.
+ */
+const STANDING_Y = DECK.surfaceY - MOVEMENT.feetOffset;
+
+/**
+ * Downward speed held while grounded.
+ *
+ * A kinematic character controller only reports itself grounded if it is being
+ * pushed *into* the floor, so a character that asks for exactly zero vertical
+ * movement floats a hair above the surface and reports itself airborne every
+ * other frame. A constant nudge downwards is the standard fix; the controller
+ * clamps it at the surface, so it costs nothing.
+ */
+const GROUND_BIAS = MOVEMENT.gravity * 0.5;
+
+/**
+ * How far below the deck counts as having fallen out of the world.
+ *
+ * Nothing should ever get here — the rim wall is twice the avatar's height and
+ * the floor collider is wider than the wall it stands inside. It is a way back
+ * from an unrecoverable state rather than a situation that is expected.
+ */
+const VOID_Y = DECK.surfaceY - AVATAR_BODY.height * 4;
+
+/**
+ * How much less than it asked for the avatar may fall and still be considered
+ * falling freely.
+ *
+ * Only has to clear floating-point noise in the controller's answer; anything
+ * the floor actually stops is short by far more than this.
+ */
+const LANDING_SLACK = AVATAR_BODY.radius * 0.01;
 
 /**
  * Per-frame scratch space. Module scope rather than `useMemo` because only one
@@ -76,17 +109,11 @@ const scratch = {
   right: new THREE.Vector3(),
   move: new THREE.Vector3(),
   target: new THREE.Vector3(),
-  position: new THREE.Vector3(),
+  step: new THREE.Vector3(),
   next: new THREE.Vector3(),
-  origin: new THREE.Vector3(),
-  center: new THREE.Vector3(),
-  scale: new THREE.Vector3(),
   local: new THREE.Vector3(),
   quaternion: new THREE.Quaternion(),
-  raycaster: new THREE.Raycaster(),
 };
-
-scratch.raycaster.far = 1;
 
 /* --------------------------------------------------------------- helpers */
 
@@ -110,18 +137,28 @@ const angleDelta = (from: number, to: number) => {
  *   2. sitting?        — if seated, hold still and skip everything else
  *   3. pick a speed    — walk, sprint or auto-run
  *   4. steer           — relative to where the camera is looking
- *   5. move and block  — obstacles, then the rim of the deck
- *   6. jump and land   — a simple arc, no physics engine
- *   7. stick to ground — a downward ray onto the grass
- *   8. face and animate
+ *   5. jump and fall   — an impulse, then gravity
+ *   6. move            — handed to Rapier, which answers with where it got to
+ *   7. face and animate
  *
- * No physics engine is involved on purpose: the world group is animated every
- * frame (it bobs while idling), and rigid bodies do not follow an animated
- * parent transform. A downward raycast gives the same result here because the
- * whole playfield is one flat disc.
+ * ## What this used to do, and what Rapier does instead
+ *
+ * Steps 5 and 6 were three separate pieces of hand-written geometry: a loop
+ * that pushed the avatar out of a registry of obstacle circles, a clamp that
+ * held it inside the radius of the grass disc, and a downward raycast onto the
+ * grass mesh to find the floor. They are all gone. `useCharacterBody` asks
+ * Rapier's kinematic character controller the one question that matters — "I
+ * would like to move by this much; where do I actually end up?" — and it
+ * answers with sliding, step-up and ground snapping already applied.
+ *
+ * The old comment here said no physics engine was involved because the world
+ * group is animated every frame and rigid bodies do not follow an animated
+ * parent. That constraint is real and it is still respected: the physics world
+ * *is* that group's local space, so the drift never enters the simulation. See
+ * `physics/WorldColliders`.
  */
 const CharacterController = () => {
-  const { spaceshipRef, exploring } = useSession();
+  const { exploring } = useSession();
   const { ref, animation, setAnimation } = useMonishwar();
   const [subscribeKeys, getKeys] = useKeyboardControls<ControlName>();
   const camera = useThree((state) => state.camera);
@@ -156,18 +193,35 @@ const CharacterController = () => {
 
   /* --- mutable state -------------------------------------------------- */
 
+  const body = useCharacterBody();
+
   const velocity = useRef(new THREE.Vector3());
-  const airHeight = useRef(0);
-  const airVelocity = useRef(0);
+  /** Vertical speed. Positive is upward; a jump sets it and gravity eats it. */
+  const rise = useRef(0);
+  /** True from the moment a jump starts until the avatar is back on a surface. */
+  const airborne = useRef(false);
   const grounded = useRef(true);
   const moveState = useRef<"idle" | "walk" | "run">("idle");
   const wasSitting = useRef(false);
   const stepTimer = useRef(0);
   const yaw = useRef(0);
-  const ground = useRef<THREE.Mesh | null>(null);
-  const groundRadius = useRef(0);
 
   /* --- spawn ----------------------------------------------------------- */
+
+  /** Puts the avatar back on its mark, standing on the grass. */
+  const spawn = useCallback(
+    (character: THREE.Object3D) => {
+      character.position.set(SPAWN.x, STANDING_Y, SPAWN.z);
+      character.rotation.y = SPAWN.yaw;
+
+      yaw.current = SPAWN.yaw;
+      rise.current = 0;
+      airborne.current = false;
+      grounded.current = true;
+      velocity.current.set(0, 0, 0);
+    },
+    [],
+  );
 
   // Drop the avatar on its mark each time explore mode starts, so the camera
   // always opens on it from the same place rather than wherever the last
@@ -176,35 +230,8 @@ const CharacterController = () => {
     if (!exploring) return;
 
     const character = ref.current;
-    if (!character) return;
-
-    character.position.set(SPAWN.x, character.position.y, SPAWN.z);
-    character.rotation.y = SPAWN.yaw;
-
-    yaw.current = SPAWN.yaw;
-    velocity.current.set(0, 0, 0);
-  }, [exploring, ref]);
-
-  /** Caches the grass mesh and its usable radius once the GLB is in the graph. */
-  const resolveGround = () => {
-    if (ground.current) return ground.current;
-
-    const spaceship = spaceshipRef?.current;
-    if (!spaceship) return null;
-
-    const mesh = spaceship.getObjectByName("ground");
-    if (!(mesh instanceof THREE.Mesh)) return null;
-
-    mesh.geometry.computeBoundingSphere();
-
-    const boundingRadius = mesh.geometry.boundingSphere?.radius ?? 0;
-    const worldScale = mesh.getWorldScale(scratch.scale);
-
-    ground.current = mesh;
-    groundRadius.current = boundingRadius * worldScale.x * MOVEMENT.edgeMargin;
-
-    return mesh;
-  };
+    if (character) spawn(character);
+  }, [exploring, ref, spawn]);
 
   useFrame((_, rawDelta) => {
     const character = ref.current;
@@ -214,23 +241,25 @@ const CharacterController = () => {
     // A backgrounded tab resumes with a huge delta; clamp so nobody teleports.
     const delta = Math.min(rawDelta, 0.1);
 
-    const groundMesh = resolveGround();
-    if (!groundMesh) return;
+    // Before anyone has taken control the avatar just stands on its mark. The
+    // physics world is paused during the intro, so there is nothing to ask;
+    // and because the avatar is a child of the drifting world group, parking
+    // it in local space is what keeps it planted on the grass while the whole
+    // scene bobs underneath the orbit camera.
+    if (!exploring) {
+      character.position.set(SPAWN.x, STANDING_Y, SPAWN.z);
+      return;
+    }
 
     /* 1. Read input --------------------------------------------------- */
 
     const keys = getKeys();
 
-    let inputX = 0;
-    let inputY = 0;
-    let sprintHeld = false;
+    let inputX = (keys.right ? 1 : 0) - (keys.left ? 1 : 0) + inputState.moveX;
+    let inputY =
+      (keys.forward ? 1 : 0) - (keys.backward ? 1 : 0) + inputState.moveY;
 
-    if (exploring) {
-      inputX = (keys.right ? 1 : 0) - (keys.left ? 1 : 0) + inputState.moveX;
-      inputY =
-        (keys.forward ? 1 : 0) - (keys.backward ? 1 : 0) + inputState.moveY;
-      sprintHeld = keys.run;
-    }
+    const sprintHeld = keys.run;
 
     let inputMagnitude = Math.min(Math.hypot(inputX, inputY), 1);
     const steering = inputMagnitude > 1e-4;
@@ -293,7 +322,6 @@ const CharacterController = () => {
     }
 
     const autoRunning =
-      exploring &&
       inputState.autoRun &&
       !isEmoting() &&
       (!steering || !settings.autoRunCancelsOnSteer);
@@ -338,83 +366,101 @@ const CharacterController = () => {
       velocityVector.set(0, 0, 0);
     }
 
-    /* 5. Move, then block ---------------------------------------------- */
-
-    character.getWorldPosition(scratch.position);
-    scratch.next.copy(scratch.position).addScaledVector(velocityVector, delta);
-
-    // Slide around anything solid standing on the disc.
-    //
-    // Nothing is done to the velocity here on purpose. An earlier version cut
-    // it to 30% on any contact, which made running past a prop feel like
-    // wading. The push-out already removes the component heading into the
-    // obstacle; the component sliding along it should survive untouched.
-    resolveObstacles(scratch.next, scratch.position.y, BODY_RADIUS);
-
-    // Keep the avatar on the grass rather than walking off into the glass.
-    groundMesh.getWorldPosition(scratch.center);
-
-    const offsetX = scratch.next.x - scratch.center.x;
-    const offsetZ = scratch.next.z - scratch.center.z;
-    const distance = Math.hypot(offsetX, offsetZ);
-    const radius = groundRadius.current;
-
-    if (radius > 0 && distance > radius) {
-      const clamp = radius / distance;
-
-      scratch.next.setX(scratch.center.x + offsetX * clamp);
-      scratch.next.setZ(scratch.center.z + offsetZ * clamp);
-      velocityVector.multiplyScalar(0.2);
-    }
-
-    /* 6. Jump and land -------------------------------------------------- */
+    /* 5. Jump and fall --------------------------------------------------- */
 
     // Draining the queue every frame also discards anything pressed before
     // explore mode started.
     const jumpRequested = consumeJump();
+    const wasGrounded = grounded.current;
+    const previousY = character.position.y;
 
-    if (jumpRequested && grounded.current && exploring && !isSitting()) {
-      grounded.current = false;
-      airVelocity.current = settings.jumpPower;
+    // `airborne` is the jump's own state, and it is deliberately not the same
+    // thing as "Rapier says we are not grounded".
+    //
+    // Rapier reports this character grounded for the *whole* of a jump —
+    // traced frame by frame, apex included, around 40% of the avatar's height
+    // clear of the floor. An earlier version keyed the vertical path off that
+    // flag, so the frame after a jump started took the grounded branch,
+    // overwrote the upward speed with the downward bias, and pulled the avatar
+    // back to the grass. The jump lasted exactly one frame: invisible standing
+    // still, a twitch while running.
+    if (jumpRequested && wasGrounded && !airborne.current && !isSitting()) {
+      rise.current = settings.jumpPower;
+      airborne.current = true;
       playSfx("jump", 0.5);
       setAnimation("Jumping");
+    } else if (airborne.current) {
+      // A jump owns the vertical axis from here until it lands.
+      rise.current -= MOVEMENT.gravity * delta;
+    } else if (wasGrounded) {
+      rise.current = -GROUND_BIAS;
+    } else {
+      // Walked off an edge rather than jumped off one.
+      rise.current -= MOVEMENT.gravity * delta;
     }
+
+    /* 6. Move -------------------------------------------------------------- */
+
+    // One question to Rapier, which answers with the movement that survived
+    // contact: slid along whatever it hit, stepped over anything low enough,
+    // and kept on the ground on the way down.
+    //
+    // Note that `character.position` goes in and comes back out untranslated.
+    // The physics world is this group's local space, so no conversion is
+    // needed in either direction — see physics/WorldColliders.
+    const requestedY = rise.current * delta;
+
+    scratch.step.set(
+      velocityVector.x * delta,
+      requestedY,
+      velocityVector.z * delta,
+    );
+
+    // Snapping stays off for the whole jump. It reaches further than a single
+    // frame of the arc, so leaving it on re-attaches the avatar to the grass
+    // on the way down and the jump ends halfway through.
+    grounded.current = body.move(
+      character.position,
+      scratch.step,
+      scratch.next,
+      !airborne.current,
+    );
+
+    if (scratch.next.y < VOID_Y) {
+      spawn(character);
+      return;
+    }
+
+    character.position.copy(scratch.next);
+
+    /*
+     * Landing is read from the movement Rapier actually allowed, not from its
+     * grounded flag — see the note above `airborne`. If the avatar asked to
+     * fall and was stopped short of it, the floor is what stopped it.
+     */
+    const descending = rise.current < 0;
+    const stoppedShort =
+      scratch.next.y - previousY > requestedY + LANDING_SLACK;
 
     let justLanded = false;
 
-    if (!grounded.current) {
-      airVelocity.current -= MOVEMENT.gravity * delta;
-      airHeight.current += airVelocity.current * delta;
-
-      if (airHeight.current <= 0) {
-        airHeight.current = 0;
-        airVelocity.current = 0;
-        grounded.current = true;
+    if (airborne.current) {
+      if (descending && stoppedShort) {
+        airborne.current = false;
+        rise.current = 0;
         justLanded = true;
       }
+    } else if (!wasGrounded && grounded.current) {
+      justLanded = true;
     }
 
-    /* 7. Stick to the ground -------------------------------------------- */
+    // The velocity is deliberately left alone after a contact. An earlier
+    // version of this file cut it to 30% whenever the avatar touched
+    // something, which made running past a prop feel like wading. Rapier has
+    // already removed the component heading into the obstacle; the component
+    // sliding along it should survive untouched.
 
-    scratch.origin.set(scratch.next.x, scratch.next.y + 0.3, scratch.next.z);
-    scratch.raycaster.set(scratch.origin, DOWN);
-
-    const [hit] = scratch.raycaster.intersectObject(groundMesh, false);
-
-    if (hit) {
-      scratch.next.setY(hit.point.y - MOVEMENT.feetOffset + airHeight.current);
-    } else {
-      // Off the edge of the collider: refuse the horizontal step.
-      scratch.next.setX(scratch.position.x);
-      scratch.next.setZ(scratch.position.z);
-      velocityVector.set(0, 0, 0);
-    }
-
-    scratch.local.copy(scratch.next);
-    parent.worldToLocal(scratch.local);
-    character.position.copy(scratch.local);
-
-    /* 8. Face the way it is going, then pick a clip ---------------------- */
+    /* 7. Face the way it is going, then pick a clip ---------------------- */
 
     if (velocityVector.lengthSq() > 1e-8) {
       parent.getWorldQuaternion(scratch.quaternion).invert();
@@ -433,8 +479,11 @@ const CharacterController = () => {
       character.rotation.y = yaw.current;
     }
 
-    // The jump clip owns the avatar until the feet are back down.
-    if (!grounded.current) return;
+    // The jump clip owns the avatar until the feet are back down. Keyed off
+    // `airborne` for the same reason the vertical path is: Rapier still calls
+    // the character grounded on the way up, so testing its flag here handed
+    // the legs straight back to the walk clip mid-jump.
+    if (airborne.current || !grounded.current) return;
 
     if (isEmoting()) {
       moveState.current = "idle";
@@ -449,7 +498,7 @@ const CharacterController = () => {
           ? "walk"
           : "idle";
 
-    /* 9. Footsteps ------------------------------------------------------ */
+    /* 8. Footsteps ------------------------------------------------------ */
 
     if (justLanded) {
       playFootstep(0.5);

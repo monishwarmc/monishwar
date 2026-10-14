@@ -67,7 +67,12 @@ const kindOf = (url: string) => {
 
 const nameOf = (url: string) => {
   try {
-    return decodeURIComponent(url.split("?")[0].split("/").pop() || url);
+    const file = decodeURIComponent(url.split("?")[0].split("/").pop() || url);
+
+    // Models are served from content-hashed URLs, so the raw filename reads
+    // "portfolio_world.5315e916.glb". The hash is for the cache, not for the
+    // person watching the loading screen.
+    return file.replace(/\.[0-9a-f]{8}(\.[^.]+)$/, "$1");
   } catch {
     return url;
   }

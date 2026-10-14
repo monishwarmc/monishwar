@@ -50,6 +50,7 @@ Other things worth knowing there:
 ```
 app/
   constants/          numbers you tune — world sizes, key bindings, your CV
+    models.generated.ts  GENERATED model URLs — import these, never a literal path
   components/
     world/            everything inside the dome
       GrassField.tsx    instanced wind grass, parted by the avatar
@@ -60,21 +61,27 @@ app/
       props/            ONE FILE PER PROP  ← most edits happen here
       random.ts         seeded scatter, so scenery is the same every reload
     models/           the GLB wrappers (avatar, ship, fountain, sofa)
+    physics/          the Rapier layer
+      WorldColliders.tsx  EVERY SOLID THING, in one list
+      useCharacterBody.tsx  the avatar's capsule and character controller
     scene/            camera, character controller, head tracking, lighting
-    controls/         input plumbing (stick, keys, obstacles, emotes, sitting)
+    controls/         input plumbing (stick, keys, emotes, sitting)
     audio/            the fountain's loop, the sound effects, the listener
     UI/               the 2D overlay — HUD, settings, loading
       guide/            the first-run tour
     settings/         every player-tunable value, persisted to localStorage
     loading/          the asset manifest behind the loading screen
+models-src/         the authored GLBs — EDIT THESE
+public/models/      compressed, content-hashed GLBs — generated, do not edit
+scripts/
+  compress-models.mjs   `pnpm models` builds one folder from the other
 ```
 
 ---
 
 ## Adding something you can walk up to and use
 
-One hook does the whole job — proximity, the prompt, the key binding and the
-collision circle:
+One hook does the proximity test, the prompt and the key binding:
 
 ```tsx
 const group = useRef<THREE.Group>(null);
@@ -84,14 +91,23 @@ useInteractable({
   id: "bench",
   label: "Bench",
   verb: "Sit",
-  radius: metres(2.6),    // how close counts
-  collision: metres(0.4), // omit to make it walk-through
-  onEngage: () => { … },
+  radius: metres(2.6),  // how close counts
+  onEngage: () => { … },   // return false to refuse, or to not stay engaged
   onRelease: () => { … },
 });
 ```
 
 Then render it in `scene/World.tsx`. `SofaSpot.tsx` is the worked example.
+
+**Being solid is a separate step.** Add a collider to
+`physics/WorldColliders.tsx` and put the prop's position in `world.constants`
+so the two read the same number. See the next section for why they cannot live
+together.
+
+`onEngage` returning `false` means "do the thing, but do not stay engaged".
+The sofa returns `true`, because the avatar stays on it until you get up. The
+control board returns `false`, because pressing the key opens the tour and
+that is the end of it.
 
 ---
 
@@ -138,6 +154,137 @@ Free Fire's layout, because it is the one every phone player already knows:
 
 ---
 
+## Physics, and the one rule about it
+
+Rapier does the collision. The avatar is a capsule driven by Rapier's
+kinematic character controller, and everything solid is a primitive collider —
+a cylinder for the grass, a ring of 32 boxes for the invisible wall at the rim,
+a cylinder each for the fountain and the sofa, a box for the control board.
+There are no trimeshes: every solid thing here is a column or a box, and the
+grass is a flat 32-vertex disc that a cylinder describes exactly.
+
+The controller gives you sliding, step-up and ground snapping for free. That
+replaced three hand-written pieces: a loop that pushed the avatar out of
+obstacle circles, a clamp that held it inside the radius of the grass, and a
+downward raycast to find the floor.
+
+### Jumping, and why it is not Rapier's job
+
+Rapier's kinematic character controller has no idea what velocity is. You hand
+it a movement delta and it hands back the part of it that survived contact. All
+ballistics — gravity, jump impulses, landing — are yours, in
+`CharacterController`.
+
+**`computedGrounded()` is not "am I on the ground".** Measured in this scene it
+returns `true` for the entire jump, apex included, with the avatar 40% of its
+own height off the floor. An early version keyed the whole vertical path off
+that flag, so the frame after a jump began took the grounded branch, overwrote
+the upward speed with the downward ground bias, and yanked the avatar back to
+the grass. The jump lasted one frame: invisible standing still, a twitch while
+running.
+
+So three things hold:
+
+- a `airborne` ref, owned by the jump, decides who controls the vertical axis
+- snap-to-ground is off for the **whole** jump, not just the ascent — it
+  reaches further than one frame of the arc and will re-attach the avatar to
+  the grass on the way down
+- landing is detected by comparing the movement Rapier allowed against the
+  movement that was asked for. Being stopped short of a fall means the floor
+  stopped you. That is frame-rate independent and does not trust the flag.
+
+There is a small downward `GROUND_BIAS` applied whenever the avatar is walking.
+A kinematic controller only calls itself grounded when it is being pushed *into*
+a surface, so asking for exactly zero vertical movement makes it float a hair
+clear and flicker. The controller clamps the nudge at the surface, so it is free.
+
+---
+
+**The rule: colliders go in `physics/WorldColliders.tsx`, never inside the prop
+that draws them.**
+
+`scene/World.tsx` bobs the whole world group while the intro camera is up, and
+@react-three/rapier reads an object's *world* matrix when it creates a
+collider. Mount one under the drifting group and it gets baked at whatever
+offset the bob happened to be at — up to 0.06 world units, half the avatar's
+height.
+
+So the colliders sit outside that group, at the positions the props are
+authored at. The physics world is, in effect, the drifting group's **local**
+space. The avatar is a child of that group, so its `position` is already in
+that space, and `useCharacterBody` passes it straight in and copies the answer
+straight back out. The bob never enters the simulation and nothing is ever
+converted.
+
+Two settings worth knowing about, both in `scene/Experience.tsx`:
+
+- `lengthUnit={AVATAR_SCALE}` tells Rapier how big a metre is here. This scene
+  is a miniature; left at the default the engine treats a 25-metre deck as a
+  one-metre object and resolves contacts far too coarsely.
+- `updatePriority={-1}` makes the world step before the character controller
+  reads it. r3f sorts frame callbacks by priority and only treats a *positive*
+  one as taking over rendering, so a negative value buys the ordering without
+  disturbing `RenderGovernor`, which owns the render at priority 1.
+
+Physics is paused whenever you are not in explore mode.
+
+---
+
+## Models are compressed, and the sources are not in `public/`
+
+`models-src/` holds what you author. `pnpm models` builds `public/models/` from
+it. **Never edit `public/models/` by hand** — it is output, and every lossy
+pass compounds, so a model that has been through the script twice has been
+through it twice.
+
+It takes the four models the scene loads from 33.3 MB to 6.9 MB. Nearly all of
+that is textures: capped in size, then re-encoded as WebP. The spaceship alone
+was 17.8 MB of image data, 7.2 MB of it a single 4K ground diffuse.
+
+### Model URLs are content-hashed — load them from the manifest
+
+`pnpm models` writes `portfolio_world.5315e916.glb` and generates
+`constants/models.generated.ts`. Load through that map:
+
+```tsx
+import { MODEL_URLS } from "@/app/constants/models.generated";
+
+useGLTF(MODEL_URLS.portfolio_world);
+```
+
+A literal `"/models/portfolio_world.glb"` is not a real URL any more and will
+404. The loading screen strips the hash back off for display.
+
+This exists because `next.config.ts` serves these with `immutable` caching, and
+`immutable` means *never revalidate* — not "revalidate less". Ship a bad file
+under a name you then reuse and every browser that loaded it is stuck with it
+for a year, with nothing you can do from the server. That is not hypothetical:
+it happened while this feature was being built, and the symptom was a scene
+with no spaceship and a collapsed fountain long after the files on disk were
+correct. Hashing the name means a rebuilt model is a *different URL*, so there
+is nothing to invalidate.
+
+`textures/` and `audio/` get the same header but are **not** hashed. Rename by
+hand if you change one.
+
+Decompression needs no wiring at all. `EXT_texture_webp` is handled by three's
+own GLTFLoader, and drei's `useGLTF` installs the meshopt decoder by default —
+and that decoder is bundled inside three-stdlib with its WASM inlined, so
+unlike Draco it costs no extra request and depends on no CDN.
+
+**The trap, if you add a model.** Geometry quantisation is off for everything
+except the avatar, and the long comment in `scripts/compress-models.mjs`
+explains why at length. The short version: quantisation moves a scale onto each
+mesh's *node*, and the gltfjsx-generated components here do not instance the
+loaded scene — they write the hierarchy out by hand and pull `geometry` off
+each node, so there is nowhere for that transform to go. It is dropped
+silently and the model collapses into a speck at the origin. No error, nothing
+in the console, just a missing spaceship. The avatar escapes it because its
+meshes are skinned, so the compensation lands in the inverse bind matrices
+instead.
+
+---
+
 ## The kiosk on the deck
 
 `world/props/ControlBoard.tsx` — the permanent reference, for anyone who
@@ -149,6 +296,19 @@ which is the one thing a sign should never look like it is doing, so the motion
 is upward now and belongs to the frame rather than the glass: the border
 breathes, four corner brackets light in turn like a scanner locking on, and
 motes drift up and fade out of the top. Nothing crosses the text.
+
+**It is also the way back into the tour.** Stand in front of it, press the
+interact key, and the guided tour opens — the same thing the `?` button does.
+Somebody who skipped the tour on the way in, or ticked "don't show this again"
+a month ago, now has an obvious place to go and get it back, and it is the
+object they would walk to anyway.
+
+**Resizing it.** One number: `BOARD_SCALE` in `world.constants.ts`. Everything
+on the board is proportional to everything else, so the border, the corner
+brackets, the drift of the motes and the lettering all scale with it. It is at
+1.65 because at its original 1.9 x 1.35m panel the rows could not be read
+without walking up to it, which rather defeats the point of a sign. Change the
+measurements individually and you get a billboard with pinstripes around it.
 
 ---
 

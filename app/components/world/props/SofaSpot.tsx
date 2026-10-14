@@ -6,8 +6,8 @@ import {
   AVATAR_SIT,
   GROUND_Y,
   metres,
-  SOFA_FIT,
-  SOFA_MODEL,
+  SOFA_FACING,
+  SOFA_POSITION,
 } from "@/app/constants/world.constants";
 import { playSfx } from "../../audio/sfx";
 import { sitDown, standUp } from "../../controls/sitState";
@@ -26,18 +26,13 @@ import { useInteractable } from "../useInteractable";
  * here is to stand the avatar in the right spot: the clip slides the hips
  * backwards as it sits, so the root has to start that far in *front* of the
  * cushion for the hips to land on it.
+ *
+ * Where it stands, and the collider that makes it solid, are both in
+ * `world.constants` and `physics/WorldColliders` respectively.
  */
-
-/** Where the sofa stands on the deck. */
-const POSITION: [number, number, number] = [0.52, 0, 0.38];
-/** Turned to face the fountain at the centre of the deck. */
-const FACING = Math.atan2(-POSITION[0], -POSITION[2]);
 
 /** The sofa's own origin is the middle of the cushion; the seat is forward. */
 const SEAT_OFFSET = new THREE.Vector3(0, 0, metres(AVATAR_SIT.hipsBehindRoot));
-
-/** Half the sofa's width once fitted, which is what the avatar bumps into. */
-const HALF_WIDTH = metres(SOFA_MODEL.halfWidth * SOFA_FIT);
 
 const SofaSpot = () => {
   const group = useRef<THREE.Group>(null);
@@ -52,7 +47,7 @@ const SofaSpot = () => {
     seat.y = GROUND_Y;
 
     playSfx("open", 0.5);
-    return sitDown({ seat, facing: FACING });
+    return sitDown({ seat, facing: SOFA_FACING });
   }, []);
 
   const onRelease = useCallback(() => {
@@ -66,15 +61,16 @@ const SofaSpot = () => {
     label: "Sofa",
     verb: "Sit",
     radius: metres(2.6),
-    // Just the body of the sofa. Any wider and the collider shoves the avatar
-    // away from the one spot it has to reach to sit down.
-    collision: HALF_WIDTH * 0.8,
     onEngage,
     onRelease,
   });
 
   return (
-    <group position={[POSITION[0], GROUND_Y, POSITION[2]]} rotation={[0, FACING, 0]} ref={group}>
+    <group
+      position={[SOFA_POSITION[0], GROUND_Y, SOFA_POSITION[2]]}
+      rotation={[0, SOFA_FACING, 0]}
+      ref={group}
+    >
       <Sofa />
     </group>
   );

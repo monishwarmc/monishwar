@@ -25,7 +25,7 @@ import {
  */
 const InteractionWatcher = () => {
   const [subscribeKeys] = useKeyboardControls<ControlName>();
-  const { exploring } = useSession();
+  const { exploring, overlay } = useSession();
   const { ref: avatar } = useMonishwar();
 
   const scratch = useMemo(
@@ -51,6 +51,13 @@ const InteractionWatcher = () => {
   useFrame(() => {
     const player = avatar.current;
     if (!player || !exploring) return;
+
+    // An overlay already cleared the interaction state on the way up (see
+    // SessionContext). Without this the loop would put it straight back the
+    // next frame, which left a live prompt behind the panel, re-played the
+    // arrival chime, and — once the control board started opening the guide —
+    // let the tour restart itself from step one while it was already open.
+    if (overlay !== "none") return;
 
     player.getWorldPosition(scratch.player);
 

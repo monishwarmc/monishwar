@@ -1,6 +1,7 @@
 "use client";
 
 import { useGLTF } from "@react-three/drei";
+import { MODEL_URLS } from "@/app/constants/models.generated";
 import { installAssetLog } from "./assetLog";
 
 /**
@@ -12,12 +13,26 @@ import { installAssetLog } from "./assetLog";
  *
  * Order matters a little — the first entries start first — so put the big ones
  * near the top.
+ *
+ * ## These files are compressed, and nothing here has to know
+ *
+ * What ships in `public/models` is built from `models-src` by `pnpm models`:
+ * textures re-encoded as WebP and capped in size, geometry and animation
+ * tracks quantised and packed with meshopt. Together that took the four models
+ * the scene loads from 33.3 MB to 6.9 MB.
+ *
+ * Decompression happens in the browser and needs no wiring, which is the
+ * reason for choosing those two formats over the alternatives. `EXT_texture_webp`
+ * is handled by three's own GLTFLoader, and drei's `useGLTF` installs the
+ * meshopt decoder by default — and that decoder is bundled inside three-stdlib
+ * with its WASM inlined, so unlike Draco it costs no extra request and depends
+ * on no CDN.
  */
 export const MODELS = [
-  "/models/portfolio_world.glb",
-  "/models/monishwar.glb",
-  "/models/fountain.glb",
-  "/models/sofa.glb",
+  MODEL_URLS.portfolio_world,
+  MODEL_URLS.monishwar,
+  MODEL_URLS.fountain,
+  MODEL_URLS.sofa,
 ] as const;
 
 /**

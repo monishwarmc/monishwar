@@ -9,6 +9,8 @@ import { GLTF } from "three-stdlib";
 import { ThreeElements } from "@react-three/fiber";
 import { useMemo } from "react";
 import { useSession } from "../contexts/SessionContext";
+import { SHIP_SCALE } from "@/app/constants/world.constants";
+import { MODEL_URLS } from "@/app/constants/models.generated";
 
 type GLTFResult = GLTF & {
   nodes: {
@@ -29,7 +31,7 @@ type GLTFResult = GLTF & {
 
 export function Spaceship(props: ThreeElements["group"]) {
   const { nodes, materials } = useGLTF(
-    "/models/portfolio_world.glb",
+    MODEL_URLS.portfolio_world,
   ) as unknown as GLTFResult;
 
   const glassMaterial = useMemo(() => {
@@ -50,7 +52,7 @@ export function Spaceship(props: ThreeElements["group"]) {
   const { spaceshipRef } = useSession();
 
   return (
-    <group {...props} dispose={null} ref={spaceshipRef} scale={0.07}>
+    <group {...props} dispose={null} ref={spaceshipRef} scale={SHIP_SCALE}>
       <mesh
         name="frame"
         castShadow

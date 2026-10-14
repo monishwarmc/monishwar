@@ -4,8 +4,8 @@ import { GLTF } from "three-stdlib";
 import { ThreeElements, useFrame } from "@react-three/fiber";
 import { useRef, useEffect } from "react";
 import AmbientLoop from "../audio/AmbientLoop";
-import { registerObstacle } from "../controls/obstacles";
 import { FOUNTAIN, GROUND_Y } from "@/app/constants/world.constants";
+import { MODEL_URLS } from "@/app/constants/models.generated";
 
 type GLTFResult = GLTF & {
   nodes: {
@@ -26,7 +26,7 @@ type GLTFResult = GLTF & {
 
 export function Fountain(props: ThreeElements["group"]) {
   const { nodes, materials } = useGLTF(
-    "/models/fountain.glb",
+    MODEL_URLS.fountain,
   ) as unknown as GLTFResult;
 
   const flowWaterRef = useRef<THREE.Mesh>(null);
@@ -68,18 +68,10 @@ export function Fountain(props: ThreeElements["group"]) {
     }
   }, [materials]);
 
+  // The basin is solid, but its collider lives in physics/WorldColliders
+  // along with everything else solid — see the note there on why none of them
+  // can be mounted under the world group that drifts.
   const groupRef = useRef<THREE.Group>(null);
-
-  // The basin is solid; FOUNTAIN.collision is its outer lip in world units.
-  useEffect(() => {
-    const group = groupRef.current;
-    if (!group) return;
-
-    return registerObstacle("fountain", {
-      object: group,
-      radius: FOUNTAIN.collision,
-    });
-  }, []);
 
   useFrame((state, delta) => {
     const time = state.clock.elapsedTime;

@@ -7,6 +7,7 @@ import { useMonishwar } from "../contexts/MonishwarContext";
 import { GLTFResult } from "../../types/GLTFresult";
 import { createIdle } from "../animations/Animations";
 import { AVATAR_SCALE, GROUND_Y } from "@/app/constants/world.constants";
+import { MODEL_URLS } from "@/app/constants/models.generated";
 
 const configureActionProps = (
   action: THREE.AnimationAction,
@@ -32,7 +33,7 @@ type MonishwarProps = ThreeElements["group"] & {
 };
 
 export function Monishwar({ animationSpeedRef, ...props }: MonishwarProps) {
-  const { scene, animations } = useGLTF("/models/monishwar.glb");
+  const { scene, animations } = useGLTF(MODEL_URLS.monishwar);
   const clone = useMemo(() => SkeletonUtils.clone(scene), [scene]);
   const { nodes, materials } = useGraph(clone) as unknown as GLTFResult;
   const { animation, ref, setAnimation } = useMonishwar();

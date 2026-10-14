@@ -215,7 +215,7 @@ const Onboarding = () => {
         {
           id: "use",
           title: "Walk up to the sofa",
-          body: "Get close to the sofa or the control board and a prompt appears here. Tap it to sit down.",
+          body: "Get close to the sofa and a prompt appears here. Tap it to sit down. The big board on the deck opens this guide the same way.",
           at: { x: "50%", y: "64%" },
           demo: <TapDemo />,
           halo: 110,
@@ -262,7 +262,7 @@ const Onboarding = () => {
       {
         id: "use",
         title: `${key("interact")} to sit down`,
-        body: "Walk up to the sofa or the control board — a prompt appears when you are close enough — then press this.",
+        body: "Walk up to the sofa — a prompt appears when you are close enough — then press this. The big board on the deck re-opens this guide the same way.",
         at: { x: "50%", y: "86%" },
         demo: <KeyDemo label={key("interact") || "E"} />,
         halo: 0,

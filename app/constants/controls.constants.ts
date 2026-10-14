@@ -98,8 +98,6 @@ export const MOVEMENT = {
    * exactly on the ground hit point.
    */
   feetOffset: GROUND_Y,
-  /** Keep the avatar off the very lip of the grass disc. */
-  edgeMargin: 0.94,
   /** Below this world speed the avatar is considered standing still. */
   idleThreshold: 0.004 * SCALE,
   /** Above this fraction of runSpeed the run animation takes over. */

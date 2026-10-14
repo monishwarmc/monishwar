@@ -2,15 +2,19 @@
 
 import { RefObject, useEffect } from "react";
 import * as THREE from "three";
-import { registerObstacle } from "../controls/obstacles";
 import { Interactable, registerInteractable } from "./interactables";
 
 /**
  * Register a prop as something the avatar can walk up to and use.
  *
- * This is the one call a new piece of scenery needs. Give it the group you
- * rendered, say how close counts and what the prompt should read, and
- * optionally how wide it is so the avatar cannot walk through it.
+ * Give it the group you rendered, say how close counts and what the prompt
+ * should read, and the prompt, the proximity test and the key binding all come
+ * for free.
+ *
+ * Being *solid* is a separate matter and is not handled here: colliders are
+ * declared in `physics/WorldColliders`, because they cannot be mounted under
+ * the world group that drifts. A prop therefore registers its interaction
+ * here and its collider there.
  */
 export const useInteractable = ({
   ref,
@@ -18,8 +22,6 @@ export const useInteractable = ({
   label,
   verb,
   radius,
-  /** Omit to make the prop walk-through. */
-  collision,
   onEngage,
   onRelease,
 }: {
@@ -28,7 +30,6 @@ export const useInteractable = ({
   label: string;
   verb: string;
   radius: number;
-  collision?: number;
   onEngage?: Interactable["onEngage"];
   onRelease?: Interactable["onRelease"];
 }) => {
@@ -46,13 +47,6 @@ export const useInteractable = ({
       onRelease,
     });
 
-    const unblock = collision
-      ? registerObstacle(`prop:${id}`, { object, radius: collision })
-      : undefined;
-
-    return () => {
-      unregister();
-      unblock?.();
-    };
-  }, [ref, id, label, verb, radius, collision, onEngage, onRelease]);
+    return unregister;
+  }, [ref, id, label, verb, radius, onEngage, onRelease]);
 };

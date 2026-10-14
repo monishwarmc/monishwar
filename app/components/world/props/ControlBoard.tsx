@@ -1,15 +1,23 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ControlName, describeKey } from "@/app/constants/controls.constants";
-import { GROUND_Y, metres } from "@/app/constants/world.constants";
-import { registerObstacle } from "../../controls/obstacles";
+import {
+  BOARD,
+  BOARD_FACING,
+  BOARD_POSITION,
+  BOARD_SCALE,
+  metres,
+} from "@/app/constants/world.constants";
+import { playSfx } from "../../audio/sfx";
+import { useSession } from "../../contexts/SessionContext";
 import { useIsTouch } from "../../hooks/useIsTouch";
 import { useSettings } from "../../settings/settings";
 import { HoloText, darkMetalMaterial, metalMaterial } from "../parts";
 import { makeRandom } from "../random";
+import { useInteractable } from "../useInteractable";
 
 /**
  * The information kiosk on the deck: a sign you walk up to and read.
@@ -31,26 +39,25 @@ import { makeRandom } from "../random";
  * Nothing crosses the text, which is what the falling line kept doing.
  *
  * It is device-aware: a phone has no keys to list, and a desktop has no stick.
+ *
+ * ## It is also the way into the guided tour
+ *
+ * Standing in front of it and pressing the interact key opens the tour, which
+ * is the same thing the ? button in the HUD does. A visitor who skipped the
+ * tour on the way in, or ticked "do not show this again" a month ago, now has
+ * somewhere obvious to go and get it back — and the board is the object they
+ * would walk to anyway, since it is already the thing with the controls on it.
+ *
+ * Where it stands and how big it is are both in `world.constants`, because the
+ * collider in `physics/WorldColliders` is sized from the same numbers.
  */
 
 /**
- * Off to one side of the spawn rather than in front of it, so it is something
- * you notice and walk over to instead of something planted in your view.
+ * Every bare measurement below is in metres at the size the board was drawn
+ * at, so each one is multiplied by this to arrive at the size it is now. See
+ * BOARD_SCALE in world.constants for why it is one factor and not a redraw.
  */
-const POSITION: [number, number, number] = [-0.95, GROUND_Y, 0.25];
-/** Turned to face the middle of the deck, which is where people come from. */
-const FACING = Math.atan2(-POSITION[0], -POSITION[2]);
-
-/** The kiosk, in metres. The panel hinges back from the top of its posts. */
-const BOARD = {
-  footing: { width: 2.1, height: 0.16, depth: 0.75 },
-  /** Height of the posts the panel leans on. */
-  postHeight: 0.95,
-  postThickness: 0.14,
-  panel: { width: 1.9, height: 1.35, thickness: 0.08 },
-  /** How far the panel leans back, in radians. */
-  tilt: 0.26,
-};
+const trim = (value: number) => metres(value * BOARD_SCALE);
 
 /** Seconds for the corner brackets to go once round. */
 const SCAN_PERIOD = 3.2;
@@ -90,6 +97,7 @@ const TOUCH_ROWS: { mark: string; label: string }[] = [
 const ControlBoard = () => {
   const isTouch = useIsTouch();
   const { bindings } = useSettings();
+  const { setOverlay } = useSession();
 
   const group = useRef<THREE.Group>(null);
   const frame = useRef<THREE.MeshBasicMaterial>(null);
@@ -98,23 +106,38 @@ const ControlBoard = () => {
 
   const { footing, postHeight, postThickness, panel, tilt } = BOARD;
 
-  // Solid, so nobody walks through the sign they are meant to read.
-  useEffect(() => {
-    const object = group.current;
-    if (!object) return;
+  /**
+   * Opening the tour, and then refusing the engagement.
+   *
+   * Returning false is what stops the board becoming the "engaged"
+   * interactable. Nothing is being held here the way the sofa holds the avatar
+   * sitting on it — the key press opens a panel and is done — and an
+   * engagement that is never released would leave a live "stand up" prompt
+   * behind the overlay.
+   */
+  const onEngage = useCallback(() => {
+    playSfx("open", 0.5);
+    setOverlay("guide");
+    return false;
+  }, [setOverlay]);
 
-    return registerObstacle("controlBoard", {
-      object,
-      radius: metres(footing.width / 2),
-    });
-  }, [footing.width]);
+  useInteractable({
+    ref: group,
+    id: "controlBoard",
+    label: "Controls",
+    verb: "Read",
+    // Generous, because the board is now big enough to read from well back
+    // and nobody should have to walk into it to get the prompt.
+    radius: metres(4),
+    onEngage,
+  });
 
   /** Each mote's lane across the face and where it is in its own climb. */
   const lanes = useMemo(() => {
     const random = makeRandom(4242);
 
     return Array.from({ length: MOTE_COUNT }, () => ({
-      x: (random() - 0.5) * (panel.width - 0.2),
+      x: (random() - 0.5) * (panel.width - 0.2 * BOARD_SCALE),
       offset: random(),
       speed: 0.7 + random() * 0.6,
       size: 0.5 + random() * 0.8,
@@ -150,7 +173,7 @@ const ControlBoard = () => {
 
       scratch.position.set(
         metres(lane.x),
-        metres(0.08 + climb * (panel.height - 0.16)),
+        trim(0.08) + climb * (metres(panel.height) - trim(0.16)),
         0,
       );
       // Thinning out as they go, rather than blinking off at the top.
@@ -165,8 +188,8 @@ const ControlBoard = () => {
   const rows = isTouch ? TOUCH_ROWS.length : KEY_ROWS.length;
 
   /** Reading area of the panel, inset from its edge. */
-  const margin = 0.1;
-  const headerDepth = 0.3;
+  const margin = 0.1 * BOARD_SCALE;
+  const headerDepth = 0.3 * BOARD_SCALE;
   const lineHeight = (panel.height - headerDepth - margin) / rows;
   /** Baseline of the first row, measured from the bottom of the panel. */
   const firstRow = panel.height - headerDepth - lineHeight / 2;
@@ -174,15 +197,15 @@ const ControlBoard = () => {
   // Three layers stacked just proud of the panel's front face, each far enough
   // clear of the last that none of them z-fight: the lit surface, then the
   // scanline and the lettering over it.
-  const litFace = metres(panel.thickness / 2 + 0.004);
-  const textFace = metres(panel.thickness / 2 + 0.012);
+  const litFace = metres(panel.thickness / 2) + trim(0.004);
+  const textFace = metres(panel.thickness / 2) + trim(0.012);
 
   return (
-    <group ref={group} position={POSITION} rotation={[0, FACING, 0]}>
+    <group ref={group} position={BOARD_POSITION} rotation={[0, BOARD_FACING, 0]}>
       {/* Footing. Sunk a little into the grass so it sits in the ground
           rather than balancing on it. */}
       <mesh
-        position={[0, metres(footing.height / 2 - 0.03), 0]}
+        position={[0, metres(footing.height / 2) - trim(0.03), 0]}
         material={metalMaterial}
       >
         <boxGeometry
@@ -198,11 +221,11 @@ const ControlBoard = () => {
       <mesh
         position={[
           0,
-          metres(footing.height - 0.04),
-          metres(footing.depth / 2 + 0.005),
+          metres(footing.height) - trim(0.04),
+          metres(footing.depth / 2) + trim(0.005),
         ]}
       >
-        <planeGeometry args={[metres(footing.width * 0.8), metres(0.025)]} />
+        <planeGeometry args={[metres(footing.width * 0.8), trim(0.025)]} />
         <meshBasicMaterial color="#38bdf8" transparent opacity={0.55} />
       </mesh>
 
@@ -249,7 +272,10 @@ const ControlBoard = () => {
           {/* The lit face of the sign. */}
           <mesh position={[0, 0, litFace]}>
             <planeGeometry
-              args={[metres(panel.width - 0.05), metres(panel.height - 0.05)]}
+              args={[
+                metres(panel.width) - trim(0.05),
+                metres(panel.height) - trim(0.05),
+              ]}
             />
             <meshBasicMaterial
               color="#0e2a3d"
@@ -262,12 +288,17 @@ const ControlBoard = () => {
 
           {/* The breathing border. Four bars rather than an outlined plane,
               so the corners meet cleanly at any thickness. */}
-          {[
-            [0, panel.height / 2 - 0.02, panel.width, 0.025],
-            [0, -panel.height / 2 + 0.02, panel.width, 0.025],
-            [-panel.width / 2 + 0.02, 0, 0.025, panel.height],
-            [panel.width / 2 - 0.02, 0, 0.025, panel.height],
-          ].map(([x, y, w, h], index) => (
+          {(() => {
+            const inset = 0.02 * BOARD_SCALE;
+            const bar = 0.025 * BOARD_SCALE;
+
+            return [
+              [0, panel.height / 2 - inset, panel.width, bar],
+              [0, -panel.height / 2 + inset, panel.width, bar],
+              [-panel.width / 2 + inset, 0, bar, panel.height],
+              [panel.width / 2 - inset, 0, bar, panel.height],
+            ];
+          })().map(([x, y, w, h], index) => (
             <mesh key={index} position={[metres(x), metres(y), litFace]}>
               <planeGeometry args={[metres(w), metres(h)]} />
               {index === 0 ? (
@@ -302,12 +333,12 @@ const ControlBoard = () => {
                 corners.current[index] = node;
               }}
               position={[
-                metres(sx * (panel.width / 2 - 0.1)),
-                metres(sy * (panel.height / 2 - 0.1)),
+                sx * (metres(panel.width / 2) - trim(0.1)),
+                sy * (metres(panel.height / 2) - trim(0.1)),
                 litFace,
               ]}
             >
-              <ringGeometry args={[metres(0.05), metres(0.075), 12]} />
+              <ringGeometry args={[trim(0.05), trim(0.075), 12]} />
               <meshBasicMaterial
                 color="#7dd3fc"
                 transparent
@@ -328,7 +359,7 @@ const ControlBoard = () => {
             args={[undefined, undefined, MOTE_COUNT]}
             frustumCulled={false}
           >
-            <circleGeometry args={[metres(0.012), 8]} />
+            <circleGeometry args={[trim(0.012), 8]} />
             <meshBasicMaterial
               color="#7dd3fc"
               transparent
@@ -338,16 +369,16 @@ const ControlBoard = () => {
           </instancedMesh>
 
           <HoloText
-            position={[0, metres(panel.height - 0.12), 0]}
-            size={0.125}
+            position={[0, metres(panel.height) - trim(0.12), 0]}
+            size={0.125 * BOARD_SCALE}
             color="#ffffff"
           >
             HOW TO MOVE
           </HoloText>
 
           <HoloText
-            position={[0, metres(panel.height - 0.235), 0]}
-            size={0.058}
+            position={[0, metres(panel.height) - trim(0.235), 0]}
+            size={0.058 * BOARD_SCALE}
             color="#7dd3fc"
           >
             {isTouch ? "Touch controls" : "Keyboard and mouse"}
@@ -360,15 +391,15 @@ const ControlBoard = () => {
                   position={[0, metres(firstRow - index * lineHeight), 0]}
                 >
                   <HoloText
-                    position={[metres(-panel.width / 2 + 0.17), 0, 0]}
-                    size={0.078}
+                    position={[-metres(panel.width / 2) + trim(0.17), 0, 0]}
+                    size={0.078 * BOARD_SCALE}
                     color="#38bdf8"
                   >
                     {row.mark}
                   </HoloText>
                   <HoloText
-                    position={[metres(0.1), 0, 0]}
-                    size={0.056}
+                    position={[trim(0.1), 0, 0]}
+                    size={0.056 * BOARD_SCALE}
                     color="#e2e8f0"
                     width={panel.width * 0.78}
                   >
@@ -392,7 +423,7 @@ const ControlBoard = () => {
                   >
                     <HoloText
                       position={[metres(-panel.width / 4), 0, 0]}
-                      size={0.056}
+                      size={0.056 * BOARD_SCALE}
                       color="#38bdf8"
                       width={panel.width * 0.42}
                     >
@@ -400,7 +431,7 @@ const ControlBoard = () => {
                     </HoloText>
                     <HoloText
                       position={[metres(panel.width / 5), 0, 0]}
-                      size={0.054}
+                      size={0.054 * BOARD_SCALE}
                       color="#e2e8f0"
                       width={panel.width * 0.5}
                     >

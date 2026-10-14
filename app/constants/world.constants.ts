@@ -96,3 +96,135 @@ export const SOFA_FIT =
 
 /** Distance from the centre of the deck out to the ring of stations. */
 export const RING_RADIUS = 1.15;
+
+/**
+ * The spaceship group's own scale, as `Spaceship` draws it.
+ *
+ * Shared because the deck measurements below are in model units and have to be
+ * brought into world units by the same number the model is drawn at.
+ */
+export const SHIP_SCALE = 0.07;
+
+/**
+ * The grass disc, measured out of `portfolio_world.glb`.
+ *
+ * The `ground` node is a 32-vertex `Circle`: perfectly flat, every vertex at
+ * y 0.420069, out to a radius of 24.891167 model units.
+ *
+ * These are written down rather than measured from the GLB at runtime, which
+ * is what the character controller used to do. Two things follow. The physics
+ * colliders can exist before the model has finished downloading, so there is
+ * no frame where the avatar has nothing to stand on; and the numbers are
+ * reviewable here next to everything else that depends on them, instead of
+ * being a bounding sphere computed in a frame callback.
+ */
+export const DECK = {
+  /** World radius of the grass. */
+  radius: 26.891167 * SHIP_SCALE,
+  /** World height of the grass surface. */
+  surfaceY: 0.420069 * SHIP_SCALE,
+  /**
+   * Where the wall around the rim stands.
+   *
+   * Inside the lip rather than on it, so the avatar is stopped while it still
+   * has grass under both feet instead of hanging over the edge of the glass.
+   */
+  get walkRadius() {
+    return this.radius * 0.94;
+  },
+} as const;
+
+/**
+ * The avatar's collision capsule.
+ *
+ * A capsule rather than the circle the old obstacle test used, because the
+ * rounded ends are what let the character controller step the avatar over the
+ * lip of the fountain and the footing of the control board instead of stopping
+ * dead against them.
+ */
+export const AVATAR_BODY = {
+  /** The model is 1.77 model-units tall and one model unit is one metre. */
+  height: 1.77 * AVATAR_SCALE,
+  /** Half-width, carried over from the old obstacle test. */
+  radius: 0.012 * SCALE,
+  /** Half the *cylindrical* part, which is what Rapier's capsule wants. */
+  get halfHeight() {
+    return this.height / 2 - this.radius;
+  },
+} as const;
+
+/* ------------------------------------------------------------------ props */
+
+/**
+ * Where the props stand on the deck.
+ *
+ * These moved out of the components that draw them because the physics
+ * colliders need the same numbers, and the colliders cannot live inside those
+ * components: the whole world group bobs while the intro camera is up, so
+ * anything mounted under it would bake that bob into its collider. The
+ * colliders therefore sit outside the drifting group, and these constants are
+ * what keeps the two in the same place.
+ *
+ * `FACING` turns each prop to look at the middle of the deck, which is where
+ * people walk in from.
+ */
+const facing = (position: readonly [number, number, number]) =>
+  Math.atan2(-position[0], -position[2]);
+
+/**
+ * Off to one side of the spawn rather than in front of it, so the board is
+ * something you notice and walk over to instead of something planted in your
+ * view.
+ */
+export const BOARD_POSITION = [-0.95, GROUND_Y, 0.25] as const;
+export const BOARD_FACING = facing(BOARD_POSITION);
+
+export const SOFA_POSITION = [0.52, GROUND_Y, 0.38] as const;
+export const SOFA_FACING = facing(SOFA_POSITION);
+
+/**
+ * How much bigger the control board is than the size it was drawn at.
+ *
+ * It is the one object in the world whose whole job is to be legible from a
+ * distance, and at its original 1.9 x 1.35m panel it had to be walked up to
+ * before the rows resolved — which defeats the point of a sign. At 1.65 the
+ * panel is 3.1 x 2.2m and the top edge stands about four metres off the grass,
+ * better than twice the avatar's height, and the rows can be read from the
+ * middle of the deck.
+ *
+ * One number rather than a redrawn set, because everything on the board is
+ * proportional to everything else: the border, the corner brackets, the drift
+ * of the motes and the lettering are all multiplied by this too. Changing the
+ * measurements individually is how a sign ends up as a billboard with
+ * pinstripes around it.
+ */
+export const BOARD_SCALE = 1.65;
+
+/**
+ * The control board, in metres. The panel hinges back from the top of its
+ * posts.
+ */
+export const BOARD = {
+  footing: {
+    width: 2.1 * BOARD_SCALE,
+    height: 0.16 * BOARD_SCALE,
+    depth: 0.75 * BOARD_SCALE,
+  },
+  /** Height of the posts the panel leans on. */
+  postHeight: 0.95 * BOARD_SCALE,
+  postThickness: 0.14 * BOARD_SCALE,
+  panel: {
+    width: 1.9 * BOARD_SCALE,
+    height: 1.35 * BOARD_SCALE,
+    thickness: 0.08 * BOARD_SCALE,
+  },
+  /** How far the panel leans back, in radians. Not a length; not scaled. */
+  tilt: 0.26,
+  /** Total height off the grass, which is what the collider is sized from. */
+  get totalHeight() {
+    return this.footing.height / 2 + this.postHeight + this.panel.height;
+  },
+} as const;
+
+/** Half the sofa's width once fitted, which is what the avatar bumps into. */
+export const SOFA_HALF_WIDTH = metres(SOFA_MODEL.halfWidth * SOFA_FIT);
