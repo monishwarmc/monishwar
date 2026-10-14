@@ -339,15 +339,3 @@ export const LANGUAGES = [
     proficiency: "Professional working proficiency",
   },
 ] as const;
-
-export const PORTFOLIO_DATA = {
-  personal: PERSONAL_INFO,
-  contact: CONTACT,
-  summary: SUMMARY,
-  skills: SKILLS,
-  experience: EXPERIENCE,
-  education: EDUCATION,
-  projects: PROJECTS,
-  certifications: CERTIFICATIONS,
-  languages: LANGUAGES,
-} as const;

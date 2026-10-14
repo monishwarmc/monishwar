@@ -75,7 +75,10 @@ export function Fountain(props: ThreeElements["group"]) {
     const group = groupRef.current;
     if (!group) return;
 
-    return registerObstacle("fountain", { object: group, radius: FOUNTAIN.collision });
+    return registerObstacle("fountain", {
+      object: group,
+      radius: FOUNTAIN.collision,
+    });
   }, []);
 
   useFrame((state, delta) => {
@@ -107,7 +110,11 @@ export function Fountain(props: ThreeElements["group"]) {
     >
       {/* Loud with your feet in the basin, a murmur from the rim of the deck.
           AmbientLoop explains why this is not drei's <PositionalAudio>. */}
-      <AmbientLoop url="/audio/fountain.mp3" refDistance={FOUNTAIN.audioRefDistance} gain={2} />
+      <AmbientLoop
+        url="/audio/fountain.mp3"
+        refDistance={FOUNTAIN.audioRefDistance}
+        gain={0.1}
+      />
       <mesh
         name="f_base"
         castShadow
@@ -151,4 +158,3 @@ export function Fountain(props: ThreeElements["group"]) {
     </group>
   );
 }
-

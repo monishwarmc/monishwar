@@ -87,22 +87,57 @@ input[type="range"],
  */
 
 @keyframes guide-stick {
+  /* A gentle push first — that is a walk — then a shove to the rim, which is
+     the run. The RUN badge below is timed to the second half. */
   0%,
-  6% {
+  5% {
     transform: translate(0, 0);
   }
-  22% {
-    transform: translate(2px, -18px);
+  18% {
+    transform: translate(2px, -15px);
   }
-  44% {
-    transform: translate(16px, 7px);
+  34% {
+    transform: translate(13px, 6px);
   }
-  66% {
-    transform: translate(-16px, 7px);
+  50% {
+    transform: translate(-13px, 6px);
   }
-  86%,
+  64% {
+    transform: translate(0, 0);
+  }
+  80%,
+  93% {
+    transform: translate(0, -34px);
+  }
   100% {
     transform: translate(0, 0);
+  }
+}
+
+@keyframes guide-run-flash {
+  0%,
+  72% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.75);
+  }
+  80%,
+  92% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.85);
+  }
+}
+
+@keyframes guide-trail {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 0.55;
   }
 }
 
@@ -189,7 +224,15 @@ input[type="range"],
 }
 
 .guide-stick {
-  animation: guide-stick 3.4s ease-in-out infinite;
+  animation: guide-stick 4.2s ease-in-out infinite;
+}
+
+.guide-run-flash {
+  animation: guide-run-flash 4.2s ease-in-out infinite;
+}
+
+.guide-trail {
+  animation: guide-trail 2.6s ease-in-out infinite;
 }
 
 .guide-swipe {

@@ -47,7 +47,7 @@ export const FOUNTAIN = {
   /** Outer lip of the basin, in model units, before scaling. */
   modelRadius: 1.86,
   get collision() {
-    return this.modelRadius * this.scale * 0.92;
+    return this.modelRadius * this.scale * 0.96;
   },
   /**
    * How far the water carries at full volume, in world units.
@@ -55,7 +55,7 @@ export const FOUNTAIN = {
    * Beyond this the panner rolls it off, so it is a murmur from the rim of the
    * deck (1.6 out) and loud with your feet in the basin.
    */
-  audioRefDistance: 0.35,
+  audioRefDistance: 0.0001,
 };
 
 /**
@@ -96,42 +96,3 @@ export const SOFA_FIT =
 
 /** Distance from the centre of the deck out to the ring of stations. */
 export const RING_RADIUS = 1.15;
-
-/**
- * The tree, measured out of `tree.glb`.
- *
- *   footprint   x -4.34 .. 4.11,  z -5.46 .. 3.38
- *   ground      y -0.06
- *   crown       y  7.33
- *   lowest leaf y  2.42
- *   trunk base  centred on x -0.04, z -1.00
- *
- * The trunk is recorded separately from the bounding box on purpose. The
- * canopy spreads unevenly, so its box centre is not the trunk — planting the
- * tree by its box would bury the trunk a metre off the spot it is meant to
- * stand on.
- */
-export const TREE_MODEL = {
-  ground: -0.0615,
-  crown: 7.3338,
-  lowestLeaf: 2.42,
-  /** Centre of the trunk's footprint — the point that gets planted. */
-  trunk: { x: -0.04, z: -1.0 },
-  /** Half the canopy's spread, for scattering falling leaves under it. */
-  canopyRadius: 4.2,
-} as const;
-
-/** How tall the tree stands, in metres. Nearly eight times the avatar. */
-export const TREE_HEIGHT = 14;
-
-/** Metres of tree per model unit — the scale that makes it TREE_HEIGHT tall. */
-export const TREE_FIT = TREE_HEIGHT / (TREE_MODEL.crown - TREE_MODEL.ground);
-
-/**
- * Where the tree stands on the deck.
- *
- * Pulled in towards the fountain as the tree grew: the canopy spreads about
- * eight metres from the trunk, and from further out than this it hung over the
- * rim of the deck and through the glass.
- */
-export const TREE_POSITION: [number, number, number] = [-0.45, GROUND_Y, -0.68];

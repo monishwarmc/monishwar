@@ -58,6 +58,7 @@ app/
       useInteractable.ts  one hook that registers a prop as usable
       InteractionWatcher.tsx  picks the nearest one, every frame
       props/            ONE FILE PER PROP  ← most edits happen here
+      random.ts         seeded scatter, so scenery is the same every reload
     models/           the GLB wrappers (avatar, ship, fountain, sofa)
     scene/            camera, character controller, head tracking, lighting
     controls/         input plumbing (stick, keys, obstacles, emotes, sitting)
@@ -112,72 +113,6 @@ If you add a chair, measure where its seat is in model units and do the same.
 
 ---
 
-## The skill tree
-
-`world/props/SkillTree.tsx`, `world/skills.ts`, `world/FallingLeaves.tsx`
-
-`tree.glb` is split the way this needs it: a `trunk`, five separate `branches`
-meshes and sixteen `leaves` clusters, each its own mesh with geometry baked in
-model space. So the five branches become the five groups in `world/skills.ts`,
-and each skill hangs off its branch as a fruit.
-
-The fruit positions are read off the branches' own vertices — ranked by how far
-out along the branch they sit, inner half discarded, then taken in order
-skipping any that would land on top of one already chosen. No hand-placed
-coordinates, so the tree can be swapped for another and the fruit still lands
-on wood.
-
-Each fruit *is* the skill's logo: the ball is wrapped in its own texture from
-`public/skills/`, the brand's colour with its mark repeated three times round
-the equator so one is facing you from any side. That is why each fruit is its
-own mesh and not an instance — instances have to share a material, and the
-whole point is that every one is a different picture.
-
-Point at a fruit and it grows and names itself; click it and its documentation
-opens in a new tab (`SKILL_DOCS` in `skills.ts` — the one place to fix a link
-that has moved). On a touchscreen the first tap names it and the second opens,
-so a stray tap while steering never throws you off the site.
-
-Walking up and pressing **E** opens the same thing as a flat list
-(`UI/SkillsPanel.tsx`), which is how it works on a phone, where there is no
-pointer and the fruit are fourteen metres up. That panel is deliberately *not*
-one of the `overlay` panels: it is open exactly when the tree is the engaged
-interactable, so there is one piece of state instead of two that have to
-agree — and routing it through `setOverlay` would have the overlay's own
-`resetInteractions` slam it shut the instant it opened.
-
-The badges are drawn by `scripts/make-skill-logos.mjs` from simple-icons (CC0),
-with a monogram for anything that has no brand mark. Re-run it after adding a
-skill.
-
-Three things to know if you change it:
-
-- **`SKILLS` stays the source of truth.** Add a skill to the CV and a fruit
-  grows. Only the *grouping* lives in `skills.ts`, because a résumé's shape and
-  a tree's branch count are different problems.
-- **Watch the units.** Positions are worked out in metres and converted to
-  world units at the last moment, by `inWorld`. They are not wrapped in a
-  scaled group, because `HoloText` already converts metres internally — a
-  scaled group converts every label twice, which shrank them to 0.8mm.
-
-- **Fruit positions are relative to the foot of the tree, not to the world.**
-  Anything comparing them against something in world space — the camera, for
-  instance — has to convert first, or the answer points nowhere. That is what
-  pushed every badge off to one side of its fruit.
-- **An InstancedMesh needs its bounding sphere recomputed.** Three builds it
-  once, lazily, from whatever the instance matrices held at the time — and the
-  first pointer move usually beats the first frame, which caches a sphere built
-  from untouched identity matrices. Hovering then silently never works.
-
-The wind is the same vertex-shader trick as the grass, weighted by distance
-from the trunk instead of height up the blade, and the trunk is excluded. The
-blossom is CPU-side: a couple of hundred leaves, each on a loop that restarts
-the moment it ends, so nothing is ever spawned or destroyed. A third of that
-loop is the fall and the rest is spent lying where it landed, which is why
-there is always a drift of them on the ground under the tree.
-
----
-
 ## The grass
 
 One instanced draw call, and everything that moves in it moves in the vertex
@@ -187,6 +122,33 @@ what makes blades spring back up *behind* you rather than the instant you pass.
 
 Density is `BASE_TUFTS` per quality level, times the player's own
 **Settings → Display → Grass density**.
+
+---
+
+## The touch controls
+
+Free Fire's layout, because it is the one every phone player already knows:
+
+- the stick **floats** — it appears under your thumb wherever it lands
+- **run has no button of its own**. Push the stick to the stop and the avatar
+  runs (`stickFullTiltRuns`); the Run button beside it is auto-run, which keeps
+  going after you let go
+- that Run button sits *by the stick*, not in the cluster opposite, because
+  reaching across the screen means letting go of the steering
+
+---
+
+## The kiosk on the deck
+
+`world/props/ControlBoard.tsx` — the permanent reference, for anyone who
+skipped the tour. It stands off to one side of the spawn rather than in front
+of it, so it is something you notice and walk over to.
+
+A line of light used to run down its face. It read as something *falling*,
+which is the one thing a sign should never look like it is doing, so the motion
+is upward now and belongs to the frame rather than the glass: the border
+breathes, four corner brackets light in turn like a scanner locking on, and
+motes drift up and fade out of the top. Nothing crosses the text.
 
 ---
 

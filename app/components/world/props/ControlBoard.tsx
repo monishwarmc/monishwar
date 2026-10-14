@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ControlName, describeKey } from "@/app/constants/controls.constants";
 import { GROUND_Y, metres } from "@/app/constants/world.constants";
@@ -9,41 +9,58 @@ import { registerObstacle } from "../../controls/obstacles";
 import { useIsTouch } from "../../hooks/useIsTouch";
 import { useSettings } from "../../settings/settings";
 import { HoloText, darkMetalMaterial, metalMaterial } from "../parts";
+import { makeRandom } from "../random";
 
 /**
- * The trailhead board on the deck: a sign you walk up to and read.
+ * The information kiosk on the deck: a sign you walk up to and read.
  *
  * The guided tour teaches the controls once; this is the reference that stays
  * put, for anyone who skipped it or came back a week later.
  *
- * It used to be a slab hanging in mid-air, because every measurement in it was
- * a "design unit" multiplied by SCALE, tuned by eye against an avatar less than
- * half the current size. That worked out to a seven-metre billboard with its
- * screen four metres up and its legs starting three-quarters of a metre above
- * the grass. Everything here is now in real metres instead, so it is a
- * 1.2m-wide panel whose feet are on the ground and whose top edge is about
- * eye height — the size a sign in a park actually is.
+ * ## The display
+ *
+ * A line of light used to run down the face of it. It read as something
+ * *falling* — which is the one thing a sign should never look like it is
+ * doing — so the motion goes upward now and belongs to the frame rather than
+ * the glass:
+ *
+ *   - the border breathes, slowly, so the thing is plainly powered
+ *   - four corner brackets light in turn, clockwise, like a scanner locking on
+ *   - motes drift up the face and fade out of the top
+ *
+ * Nothing crosses the text, which is what the falling line kept doing.
  *
  * It is device-aware: a phone has no keys to list, and a desktop has no stick.
  */
 
-/** Stands just in front of the spawn point, angled towards it. */
-const POSITION: [number, number, number] = [-0.46, GROUND_Y, 0.46];
+/**
+ * Off to one side of the spawn rather than in front of it, so it is something
+ * you notice and walk over to instead of something planted in your view.
+ */
+const POSITION: [number, number, number] = [-0.95, GROUND_Y, 0.25];
+/** Turned to face the middle of the deck, which is where people come from. */
 const FACING = Math.atan2(-POSITION[0], -POSITION[2]);
 
-/** The board, in metres. The panel hinges back from the top of its posts. */
+/** The kiosk, in metres. The panel hinges back from the top of its posts. */
 const BOARD = {
-  footing: { width: 1.3, height: 0.12, depth: 0.58 },
+  footing: { width: 2.1, height: 0.16, depth: 0.75 },
   /** Height of the posts the panel leans on. */
-  postHeight: 0.62,
-  postThickness: 0.1,
-  panel: { width: 1.2, height: 0.88, thickness: 0.07 },
+  postHeight: 0.95,
+  postThickness: 0.14,
+  panel: { width: 1.9, height: 1.35, thickness: 0.08 },
   /** How far the panel leans back, in radians. */
-  tilt: 0.3,
+  tilt: 0.26,
 };
 
-/** Seconds for the scanline to travel once down the panel. */
-const SCAN_PERIOD = 4.5;
+/** Seconds for the corner brackets to go once round. */
+const SCAN_PERIOD = 3.2;
+
+/** Seconds for one mote to drift from the bottom of the face to the top. */
+const MOTE_RISE = 5.5;
+const MOTE_COUNT = 14;
+
+/** Per-frame scratch — see the note in CharacterController. */
+const scratch = new THREE.Object3D();
 
 type Row = { keys: ControlName[]; literal?: string; label: string };
 
@@ -75,7 +92,9 @@ const ControlBoard = () => {
   const { bindings } = useSettings();
 
   const group = useRef<THREE.Group>(null);
-  const scan = useRef<THREE.Mesh>(null);
+  const frame = useRef<THREE.MeshBasicMaterial>(null);
+  const corners = useRef<(THREE.Mesh | null)[]>([]);
+  const motes = useRef<THREE.InstancedMesh>(null);
 
   const { footing, postHeight, postThickness, panel, tilt } = BOARD;
 
@@ -90,26 +109,64 @@ const ControlBoard = () => {
     });
   }, [footing.width]);
 
+  /** Each mote's lane across the face and where it is in its own climb. */
+  const lanes = useMemo(() => {
+    const random = makeRandom(4242);
+
+    return Array.from({ length: MOTE_COUNT }, () => ({
+      x: (random() - 0.5) * (panel.width - 0.2),
+      offset: random(),
+      speed: 0.7 + random() * 0.6,
+      size: 0.5 + random() * 0.8,
+    }));
+  }, [panel.width]);
+
   useFrame(({ clock }) => {
-    const bar = scan.current;
-    if (!bar) return;
+    const time = clock.elapsedTime;
 
-    // A line of light running down the panel, the way a display refreshes.
-    // Cheaper and far more alive than pulsing the whole surface, which is
-    // what this used to do — a glow that breathes reads as a lamp, a line
-    // that travels reads as a screen.
-    const travel = (clock.elapsedTime % SCAN_PERIOD) / SCAN_PERIOD;
+    // The border breathes, so the thing is plainly powered even from across
+    // the deck where the text is too small to read.
+    if (frame.current) {
+      frame.current.opacity = 0.45 + Math.sin(time * 1.1) * 0.18;
+    }
 
-    bar.position.y = panel.height * (0.98 - travel * 0.96);
-    (bar.material as THREE.MeshBasicMaterial).opacity =
-      0.5 * Math.sin(travel * Math.PI) ** 0.5;
+    // Corner brackets light in turn, clockwise: a scanner locking on.
+    const lit = Math.floor((time / SCAN_PERIOD) * 4) % 4;
+
+    corners.current.forEach((corner, index) => {
+      if (!corner) return;
+
+      const material = corner.material as THREE.MeshBasicMaterial;
+      material.opacity = index === lit ? 0.95 : 0.22;
+    });
+
+    // Motes drift up the face and fade out of the top. Upward, deliberately:
+    // see the note at the top of the file.
+    const mote = motes.current;
+    if (!mote) return;
+
+    lanes.forEach((lane, index) => {
+      const climb = ((time * lane.speed) / MOTE_RISE + lane.offset) % 1;
+
+      scratch.position.set(
+        metres(lane.x),
+        metres(0.08 + climb * (panel.height - 0.16)),
+        0,
+      );
+      // Thinning out as they go, rather than blinking off at the top.
+      scratch.scale.setScalar(lane.size * (1 - climb) ** 0.7);
+      scratch.updateMatrix();
+      mote.setMatrixAt(index, scratch.matrix);
+    });
+
+    mote.instanceMatrix.needsUpdate = true;
   });
 
   const rows = isTouch ? TOUCH_ROWS.length : KEY_ROWS.length;
 
   /** Reading area of the panel, inset from its edge. */
-  const margin = 0.07;
-  const headerDepth = 0.19;
+  const margin = 0.1;
+  const headerDepth = 0.3;
   const lineHeight = (panel.height - headerDepth - margin) / rows;
   /** Baseline of the first row, measured from the bottom of the panel. */
   const firstRow = panel.height - headerDepth - lineHeight / 2;
@@ -124,9 +181,16 @@ const ControlBoard = () => {
     <group ref={group} position={POSITION} rotation={[0, FACING, 0]}>
       {/* Footing. Sunk a little into the grass so it sits in the ground
           rather than balancing on it. */}
-      <mesh position={[0, metres(footing.height / 2 - 0.03), 0]} material={metalMaterial}>
+      <mesh
+        position={[0, metres(footing.height / 2 - 0.03), 0]}
+        material={metalMaterial}
+      >
         <boxGeometry
-          args={[metres(footing.width), metres(footing.height), metres(footing.depth)]}
+          args={[
+            metres(footing.width),
+            metres(footing.height),
+            metres(footing.depth),
+          ]}
         />
       </mesh>
 
@@ -153,7 +217,11 @@ const ControlBoard = () => {
           material={darkMetalMaterial}
         >
           <boxGeometry
-            args={[metres(postThickness), metres(postHeight), metres(postThickness)]}
+            args={[
+              metres(postThickness),
+              metres(postHeight),
+              metres(postThickness),
+            ]}
           />
         </mesh>
       ))}
@@ -191,27 +259,95 @@ const ControlBoard = () => {
               depthWrite={false}
             />
           </mesh>
+
+          {/* The breathing border. Four bars rather than an outlined plane,
+              so the corners meet cleanly at any thickness. */}
+          {[
+            [0, panel.height / 2 - 0.02, panel.width, 0.025],
+            [0, -panel.height / 2 + 0.02, panel.width, 0.025],
+            [-panel.width / 2 + 0.02, 0, 0.025, panel.height],
+            [panel.width / 2 - 0.02, 0, 0.025, panel.height],
+          ].map(([x, y, w, h], index) => (
+            <mesh key={index} position={[metres(x), metres(y), litFace]}>
+              <planeGeometry args={[metres(w), metres(h)]} />
+              {index === 0 ? (
+                <meshBasicMaterial
+                  ref={frame}
+                  color="#5eead4"
+                  transparent
+                  opacity={0.5}
+                  depthWrite={false}
+                />
+              ) : (
+                <meshBasicMaterial
+                  color="#5eead4"
+                  transparent
+                  opacity={0.5}
+                  depthWrite={false}
+                />
+              )}
+            </mesh>
+          ))}
+
+          {/* Corner brackets, lighting in turn. Clockwise from top-left. */}
+          {[
+            [-1, 1],
+            [1, 1],
+            [1, -1],
+            [-1, -1],
+          ].map(([sx, sy], index) => (
+            <mesh
+              key={index}
+              ref={(node) => {
+                corners.current[index] = node;
+              }}
+              position={[
+                metres(sx * (panel.width / 2 - 0.1)),
+                metres(sy * (panel.height / 2 - 0.1)),
+                litFace,
+              ]}
+            >
+              <ringGeometry args={[metres(0.05), metres(0.075), 12]} />
+              <meshBasicMaterial
+                color="#7dd3fc"
+                transparent
+                opacity={0.22}
+                depthWrite={false}
+              />
+            </mesh>
+          ))}
         </group>
 
         {/* Everything below is positioned from the bottom edge of the panel,
             which is where the measurements above are written from. */}
         <group position={[0, 0, textFace]}>
-          <mesh ref={scan}>
-            <planeGeometry args={[metres(panel.width - 0.06), metres(0.03)]} />
-            <meshBasicMaterial color="#7dd3fc" transparent opacity={0} depthWrite={false} />
-          </mesh>
+          {/* Motes drifting up the face. One instanced mesh, because they are
+              all the same speck. */}
+          <instancedMesh
+            ref={motes}
+            args={[undefined, undefined, MOTE_COUNT]}
+            frustumCulled={false}
+          >
+            <circleGeometry args={[metres(0.012), 8]} />
+            <meshBasicMaterial
+              color="#7dd3fc"
+              transparent
+              opacity={0.5}
+              depthWrite={false}
+            />
+          </instancedMesh>
 
           <HoloText
-            position={[0, metres(panel.height - 0.08), 0]}
-            size={0.082}
+            position={[0, metres(panel.height - 0.12), 0]}
+            size={0.125}
             color="#ffffff"
           >
             HOW TO MOVE
           </HoloText>
 
           <HoloText
-            position={[0, metres(panel.height - 0.155), 0]}
-            size={0.038}
+            position={[0, metres(panel.height - 0.235), 0]}
+            size={0.058}
             color="#7dd3fc"
           >
             {isTouch ? "Touch controls" : "Keyboard and mouse"}
@@ -224,15 +360,15 @@ const ControlBoard = () => {
                   position={[0, metres(firstRow - index * lineHeight), 0]}
                 >
                   <HoloText
-                    position={[metres(-panel.width / 2 + 0.11), 0, 0]}
-                    size={0.055}
+                    position={[metres(-panel.width / 2 + 0.17), 0, 0]}
+                    size={0.078}
                     color="#38bdf8"
                   >
                     {row.mark}
                   </HoloText>
                   <HoloText
-                    position={[metres(0.06), 0, 0]}
-                    size={0.04}
+                    position={[metres(0.1), 0, 0]}
+                    size={0.056}
                     color="#e2e8f0"
                     width={panel.width * 0.78}
                   >
@@ -256,7 +392,7 @@ const ControlBoard = () => {
                   >
                     <HoloText
                       position={[metres(-panel.width / 4), 0, 0]}
-                      size={0.04}
+                      size={0.056}
                       color="#38bdf8"
                       width={panel.width * 0.42}
                     >
@@ -264,7 +400,7 @@ const ControlBoard = () => {
                     </HoloText>
                     <HoloText
                       position={[metres(panel.width / 5), 0, 0]}
-                      size={0.038}
+                      size={0.054}
                       color="#e2e8f0"
                       width={panel.width * 0.5}
                     >

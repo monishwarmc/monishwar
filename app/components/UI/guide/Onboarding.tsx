@@ -130,6 +130,13 @@ const Onboarding = () => {
   const isTouch = useIsTouch();
 
   const [index, setIndex] = useState(0);
+
+  /**
+   * Ticked by default: someone reaching for Skip has told you what they think
+   * of it, and asking them again next visit is not a kindness. Untick it and
+   * the tour is waiting when they come back.
+   */
+  const [dismissForGood, setDismissForGood] = useState(true);
   const [progress, setProgress] = useState<Progress>(EMPTY);
 
   const open = overlay === "guide" && exploring;
@@ -398,10 +405,16 @@ const Onboarding = () => {
 
   /* --- moving through the tour ---------------------------------------- */
 
+  /**
+   * Close the tour.
+   *
+   * Whether it comes back next visit is the checkbox's business, not this
+   * function's. It used to decide on the player's behalf — skipping once meant
+   * never seeing it again, with nothing on screen saying so, which is a thing
+   * to be told rather than to find out.
+   */
   const finish = () => {
-    // Shown once. The ? button and the settings panel both bring it back, and
-    // the control board on the deck has the full list permanently.
-    updateSettings({ showHelpOnStart: false });
+    updateSettings({ showHelpOnStart: !dismissForGood });
     setOverlay("none");
   };
 
@@ -460,7 +473,7 @@ const Onboarding = () => {
 
           <button
             type="button"
-            aria-label="Skip the tour"
+            aria-label="Close the tour"
             onClick={() => {
               press();
               finish();
@@ -496,6 +509,29 @@ const Onboarding = () => {
             className="rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/20 active:scale-95"
           >
             {index + 1 >= steps.length ? "Done" : "Skip step"}
+          </button>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-2.5">
+          <label className="flex cursor-pointer select-none items-center gap-2 text-[11px] text-white/55 hover:text-white/80">
+            <input
+              type="checkbox"
+              checked={dismissForGood}
+              onChange={(event) => setDismissForGood(event.target.checked)}
+              className="h-3.5 w-3.5 accent-emerald-400"
+            />
+            Don&apos;t show this again
+          </label>
+
+          <button
+            type="button"
+            onClick={() => {
+              press();
+              finish();
+            }}
+            className="rounded-full px-2.5 py-1 text-[11px] font-medium text-white/55 underline-offset-2 transition-colors hover:bg-white/10 hover:text-white hover:underline"
+          >
+            Skip the tour
           </button>
         </div>
       </div>

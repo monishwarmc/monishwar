@@ -32,7 +32,11 @@ export type Settings = {
   jumpPower: number;
   /** When off, grabbing the stick steers without cancelling auto-run. */
   autoRunCancelsOnSteer: boolean;
-  /** Pushing the stick past ~85% runs, the way Free Fire's stick does. */
+  /**
+   * Pushing the stick to the stop runs, the way Free Fire's does — on by
+   * default, because reaching for a button to break into a run is the thing
+   * that gives a touch control scheme away.
+   */
   stickFullTiltRuns: boolean;
 
   // --- HUD ---
@@ -89,7 +93,7 @@ export const DEFAULT_SETTINGS: Settings = {
   turnRate: MOVEMENT.turnRate,
   jumpPower: MOVEMENT.jumpVelocity,
   autoRunCancelsOnSteer: true,
-  stickFullTiltRuns: false,
+  stickFullTiltRuns: true,
 
   mirrorHud: false,
   hudScale: 1,

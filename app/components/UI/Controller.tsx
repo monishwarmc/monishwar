@@ -5,6 +5,7 @@ import { resetInput } from "../controls/inputState";
 import { useIsTouch } from "../hooks/useIsTouch";
 import ActionButtons from "./ActionButtons";
 import Joystick from "./Joystick";
+import RunButton from "./RunButton";
 import KeyHints from "./KeyHints";
 
 /**
@@ -32,6 +33,7 @@ const Controller = () => {
   return (
     <>
       <Joystick />
+      <RunButton />
       <ActionButtons />
     </>
   );

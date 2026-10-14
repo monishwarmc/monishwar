@@ -18,30 +18,58 @@ import { ReactNode } from "react";
  */
 
 /**
- * A pointing hand.
+ * The two hands, as single traced paths.
  *
- * Built out of rounded boxes rather than one traced path: it stays crisp at
- * thumb size, and it matches the HUD's own geometry instead of looking like a
- * clip-art hand dropped on top of it. The drop shadow is on the whole shape,
- * so the overlapping boxes read as one silhouette over any background.
+ * Two, because the gestures are not the same gesture: you push a stick with
+ * your *thumb* and you tap a button with your *finger*, and drawing both with
+ * the same shape is most of why the old one read as a blob with a stick on
+ * top. That version was also built from four overlapping rounded boxes, which
+ * ruled out an outline — any stroke drew the seams between them. One path
+ * takes a stroke cleanly, and the stroke is what keeps a white hand visible
+ * against pale grass as well as against the sky.
  */
-const Hand = ({ size = 56 }: { size?: number }) => (
+const HAND =
+  "M25 13a7 7 0 0 1 14 0v27a5.5 5.5 0 0 1 11 0v4a5.5 5.5 0 0 1 11 0v17a26 26 0 0 1-26 26h-6a22 22 0 0 1-17.5-8.7L3.4 57.6a7 7 0 0 1 10.6-9.1L25 59.5Z";
+
+const THUMB =
+  "M46 6a11 11 0 0 1 11 11v20h4a9 9 0 0 1 0 18h-2v6a20 20 0 0 1-20 20H25A21 21 0 0 1 4 60V44a9 9 0 0 1 17-4l14 8V17A11 11 0 0 1 46 6Z";
+
+const Silhouette = ({
+  path,
+  box,
+  width,
+  height,
+}: {
+  path: string;
+  box: string;
+  width: number;
+  height: number;
+}) => (
   <svg
-    viewBox="0 0 64 88"
-    width={size}
-    height={(size * 88) / 64}
+    viewBox={box}
+    width={width}
+    height={height}
     className="guide-hand"
     aria-hidden="true"
   >
-    <g fill="rgba(255,255,255,0.95)">
-      {/* The index finger, out on its own — this is what "point" looks like. */}
-      <rect x="26" y="2" width="12" height="42" rx="6" />
-      {/* Curled middle and thumb, enough to stop it reading as a lollipop. */}
-      <rect x="37" y="24" width="11" height="24" rx="5.5" />
-      <rect x="16" y="29" width="11" height="19" rx="5.5" />
-      <rect x="15" y="39" width="34" height="42" rx="16" />
-    </g>
+    <path
+      d={path}
+      fill="#ffffff"
+      stroke="rgba(10,16,24,0.45)"
+      strokeWidth="2.5"
+      strokeLinejoin="round"
+    />
   </svg>
+);
+
+/** An index finger, for tapping and swiping. */
+const PointingHand = ({ size = 50 }: { size?: number }) => (
+  <Silhouette path={HAND} box="0 0 64 94" width={size} height={(size * 94) / 64} />
+);
+
+/** A thumb, for the stick. */
+const Thumb = ({ size = 56 }: { size?: number }) => (
+  <Silhouette path={THUMB} box="0 0 70 86" width={size} height={(size * 86) / 70} />
 );
 
 /** The halo that marks where on screen the gesture is happening. */
@@ -87,17 +115,30 @@ export const GestureStage = ({
 
 /* ------------------------------------------------------------------ touch */
 
-/** A thumb pushing a floating stick around its circle. */
+/**
+ * A thumb working a floating stick — and, in the second half of the loop,
+ * shoving it to the rim and lighting up RUN.
+ *
+ * That second half is the whole reason this demo is worth its space. The stick
+ * has two speeds and the fast one has no button: you get it by pushing all the
+ * way. Nobody discovers that by being told, but everybody copies a thumb.
+ */
 export const StickDemo = () => (
   <>
-    <span className="h-[120px] w-[120px] rounded-full border-2 border-white/30 bg-black/25" />
+    <span className="h-[124px] w-[124px] rounded-full border-2 border-white/30 bg-black/25" />
+    {/* The rim, lit, so "all the way" has something to be all the way to. */}
+    <span className="absolute h-[124px] w-[124px] rounded-full border-2 border-emerald-300/40" />
 
     {/* Knob and thumb share one wrapper so they can never drift apart. */}
     <span className="guide-stick absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
       <span className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60 bg-white/25 backdrop-blur-sm" />
-      <span className="absolute left-1/2 top-1/2 translate-x-[-10px] translate-y-[-6px]">
-        <Hand size={52} />
+      <span className="absolute left-1/2 top-1/2 translate-x-[-14px] translate-y-[-8px]">
+        <Thumb size={54} />
       </span>
+    </span>
+
+    <span className="guide-run-flash absolute left-1/2 top-[-30px] rounded-full border border-emerald-300/80 bg-emerald-400/30 px-2.5 py-1 text-[10px] font-bold tracking-widest text-emerald-50">
+      RUN
     </span>
   </>
 );
@@ -131,7 +172,7 @@ export const SwipeDemo = () => (
     </svg>
 
     <span className="guide-swipe relative top-3">
-      <Hand size={52} />
+      <PointingHand size={50} />
     </span>
   </>
 );
@@ -141,7 +182,7 @@ export const TapDemo = () => (
   <>
     <span className="guide-ripple absolute h-16 w-16 rounded-full border-2 border-emerald-300/90" />
     <span className="guide-tap relative">
-      <Hand size={52} />
+      <PointingHand size={50} />
     </span>
   </>
 );
