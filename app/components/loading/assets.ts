@@ -31,6 +31,7 @@ import { installAssetLog } from "./assetLog";
 export const MODELS = [
   MODEL_URLS.portfolio_world,
   MODEL_URLS.monishwar,
+  MODEL_URLS.tree,
   MODEL_URLS.fountain,
   MODEL_URLS.sofa,
 ] as const;

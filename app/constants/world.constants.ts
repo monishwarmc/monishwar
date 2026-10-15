@@ -179,7 +179,7 @@ const facing = (position: readonly [number, number, number]) =>
 export const BOARD_POSITION = [-0.95, GROUND_Y, 0.25] as const;
 export const BOARD_FACING = facing(BOARD_POSITION);
 
-export const SOFA_POSITION = [0.52, GROUND_Y, 0.38] as const;
+export const SOFA_POSITION = [0.4, GROUND_Y, 0.52] as const;
 export const SOFA_FACING = facing(SOFA_POSITION);
 
 /**
@@ -228,3 +228,85 @@ export const BOARD = {
 
 /** Half the sofa's width once fitted, which is what the avatar bumps into. */
 export const SOFA_HALF_WIDTH = metres(SOFA_MODEL.halfWidth * SOFA_FIT);
+
+/* ------------------------------------------------------------------- tree */
+
+/**
+ * The tree, measured out of `tree.glb`.
+ *
+ *   footprint   x -4.34 .. 4.11,  z -5.46 .. 3.38
+ *   ground      y -0.06
+ *   crown       y  7.33
+ *   lowest leaf y  2.42
+ *   trunk base  centred on x -0.04, z -1.00
+ *
+ * The trunk is recorded separately from the bounding box on purpose. The
+ * canopy spreads unevenly, so its box centre is not the trunk — planting the
+ * tree by its box would bury the trunk a metre off the spot it is meant to
+ * stand on.
+ */
+export const TREE_MODEL = {
+  ground: -0.0615,
+  crown: 7.3338,
+  lowestLeaf: 2.42,
+  /** Centre of the trunk's footprint — the point that gets planted. */
+  trunk: { x: -0.04, z: -1.0 },
+  /** Half the canopy's spread, for scattering falling leaves under it. */
+  canopyRadius: 4.2,
+} as const;
+
+/** How tall the tree stands, in metres. Nearly eight times the avatar. */
+export const TREE_HEIGHT = 14;
+
+/** Metres of tree per model unit — the scale that makes it TREE_HEIGHT tall. */
+export const TREE_FIT = TREE_HEIGHT / (TREE_MODEL.crown - TREE_MODEL.ground);
+
+/* --------------------------------------------------------------- stations */
+
+/**
+ * WHERE EVERY BIG THING STANDS ON THE DECK.
+ *
+ * The deck is a disc of radius `DECK.radius` — about 25 metres across — and
+ * these are the exhibits arranged around it. Keeping them in one list is what
+ * makes it possible to see at a glance that nothing overlaps anything else,
+ * which is not obvious from four separate component files.
+ *
+ * Positions are world units, as [x, z]. `facing` turns each one to look at the
+ * middle of the deck, because that is where people walk in from.
+ *
+ * Clearances, so the next thing added here has something to check against:
+ *
+ *   fountain     centre, 0.09 radius
+ *   tree         canopy reaches 0.55, so it cannot stand past 1.08 from centre
+ *   control board 0.12 half-width, sofa 0.04
+ *
+ * Nothing may reach past `DECK.radius` (1.742) or it stands through the glass,
+ * and ideally nothing past `DECK.walkRadius` (1.638) or you cannot get behind
+ * it. The first arrangement of these four had three of them outside the dome
+ * and two overlapping each other, which no screenshot made obvious — a wall
+ * seen edge-on through a tree looks much like a wall.
+ *
+ * `scripts/check-layout.mjs` does the arithmetic. Run it after moving anything
+ * here; it is faster and more reliable than walking the deck looking for it.
+ */
+const station = (x: number, z: number) => ({
+  position: [x, GROUND_Y, z] as [number, number, number],
+  facing: Math.atan2(-x, -z),
+  /** Distance from the middle of the deck, for the clearance notes above. */
+  reach: Math.hypot(x, z),
+});
+
+/** The skill tree. Kept well inside the rim so the canopy clears the glass. */
+export const TREE_STATION = station(-0.55, -0.5);
+
+/** The project gallery: a wide arc you walk along. */
+export const PROJECTS_STATION = station(1.05, 0.05);
+
+/** The certificate carousel. */
+export const CERTS_STATION = station(0.45, -1.1);
+
+/** Experience, education, languages and contact. */
+export const PROFILE_STATION = station(-0.3, 1.0);
+
+/** Kept for the tree's own module, which was written against this name. */
+export const TREE_POSITION = TREE_STATION.position;

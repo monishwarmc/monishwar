@@ -18,6 +18,7 @@ import {
 import { publishHeading } from "../controls/heading";
 import { useMonishwar } from "../contexts/MonishwarContext";
 import { useSettings } from "../settings/settings";
+import { useCameraClearance } from "../physics/useCameraClearance";
 
 /** Per-frame scratch space — see the note in CharacterController. */
 const scratch = {
@@ -25,6 +26,7 @@ const scratch = {
   target: new THREE.Vector3(),
   smoothTarget: new THREE.Vector3(),
   desired: new THREE.Vector3(),
+  toCamera: new THREE.Vector3(),
 };
 
 /** Movement past this many pixels counts as a drag, not a tap. */
@@ -52,6 +54,7 @@ const FollowCamera = () => {
   const camera = useThree((state) => state.camera);
   const domElement = useThree((state) => state.gl.domElement);
   const settings = useSettings();
+  const clearance = useCameraClearance();
 
   const yaw = useRef(0);
   const pitch = useRef(0.3);
@@ -201,6 +204,25 @@ const FollowCamera = () => {
       scratch.target.y + Math.sin(pitch.current) * distance.current,
       scratch.target.z + Math.cos(yaw.current) * horizontal,
     );
+
+    // Pull in if a wall is in the way.
+    //
+    // Worth doing before the floor clamp below, because the clamp moves the
+    // lens straight up and a lens that has already been pulled in needs less
+    // of that. The deck has four large exhibits on it now and the camera used
+    // to pull back straight through them.
+    const reachable = clearance.clear(scratch.target, scratch.desired);
+    const wanted = scratch.target.distanceTo(scratch.desired);
+
+    if (reachable < wanted) {
+      scratch.toCamera
+        .copy(scratch.desired)
+        .sub(scratch.target)
+        .normalize()
+        .multiplyScalar(reachable);
+
+      scratch.desired.copy(scratch.target).add(scratch.toCamera);
+    }
 
     // Never let the lens dip below the grass the avatar is standing on.
     const floor =

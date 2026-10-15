@@ -76,6 +76,20 @@ const CAPSULE_CENTRE = MOVEMENT.feetOffset + AVATAR_BODY.height / 2;
  */
 type World = ReturnType<typeof useRapier>["world"];
 
+/**
+ * The avatar's own capsule, for queries that must not hit it.
+ *
+ * Module scope because the camera needs it and the two hooks have no React
+ * relationship — the camera is not inside the character controller, it only
+ * follows it. One avatar is ever mounted, which is the same assumption the
+ * frame-loop scratch space in `CharacterController` makes.
+ */
+let characterCollider: ReturnType<
+  ReturnType<typeof useRapier>["world"]["createCollider"]
+> | null = null;
+
+export const getCharacterCollider = () => characterCollider;
+
 type Rig = {
   collider: ReturnType<World["createCollider"]>;
   controller: ReturnType<World["createCharacterController"]>;
@@ -100,9 +114,11 @@ export const useCharacterBody = () => {
     controller.enableSnapToGround(SNAP_DISTANCE);
 
     rig.current = { collider, controller };
+    characterCollider = collider;
 
     return () => {
       rig.current = null;
+      characterCollider = null;
       world.removeCharacterController(controller);
       world.removeCollider(collider, false);
     };

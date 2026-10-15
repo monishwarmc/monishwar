@@ -285,6 +285,110 @@ instead.
 
 ---
 
+## The four exhibits
+
+Everything in `portfolio.constants.ts` is on the deck somewhere. Where each one
+stands is in **one** place — the `STATIONS` block in `world.constants.ts` —
+with the clearance arithmetic written next to it, because four large things on
+a 25-metre disc is exactly the situation where two of them quietly end up
+inside each other.
+
+| Station | Component | What it shows |
+|---|---|---|
+| Skill tree | `props/SkillTree.tsx` | 42 skills as fruit, five branches |
+| Certificates | `props/CertificateWall.tsx` | 18 certificates behind a cut-out |
+| Projects | `props/ProjectStage.tsx` | the live sites, in iframes |
+| Profile | `props/ProfileStation.tsx` | experience, education, languages, contact |
+
+### Panels face `-angle`, never `angle + PI`
+
+A station group is rotated by `atan2(-x, -z)`, which maps its **local +Z** onto
+the direction of the deck's centre. So inside a station the viewer stands
+towards +Z, and a panel sitting at `angle` around a ring faces back along it
+with a rotation of `-angle`.
+
+`angle + PI` is the tempting wrong answer: it negates the X component correctly
+and the Z component as well, so the panels end up facing out through the glass.
+It is not obvious from a screenshot either, because a lit slab looks much the
+same from behind. There is a four-line check for this in the session notes; if
+you add a fifth exhibit, run the dot product rather than eyeballing it.
+
+### The skill tree
+
+`tree.glb` has exactly five branch meshes, which is why `world/skills.ts` has
+exactly five groups — the mapping is one-to-one, in file order. `SKILLS` in
+`portfolio.constants` stays the source of truth; only the *grouping* lives in
+`skills.ts`, because a CV's shape is about how a résumé reads and not about how
+many branches a tree has.
+
+Touch a fruit and it falls: gravity, one bounce, and then it opens what that
+skill has to show for itself. `destinationFor()` decides — **certificate first,
+documentation second, nothing third**. The fall is not decoration; it is the
+gap between "I touched something" and "a panel appeared", which is why the
+destination fires on landing rather than on the click. Fruit grows back after
+about three seconds, because a tree that empties as you walk round it is a tree
+you can only read once.
+
+### The certificate wall
+
+Eighteen certificates on a **ring**, not a line. As a line it was a hundred and
+seventy metres of track running out through the glass and off into space.
+
+Two things make the cut-out work:
+
+- the slides are positioned each frame by their shortest offset around the
+  ring, and hidden past ±1.6
+- their materials are **clipped** to the window by two planes pushed into world
+  space every frame. This is not optional: a slab wide enough to hide a slide
+  mid-transition would be wider than half the deck. It needs
+  `gl.localClippingEnabled = true`, which is set in `Experience.tsx`.
+
+The images need `/api/cert-image`. Coursera, Credly and the rest serve without
+`Access-Control-Allow-Origin`, which is fine for an `<img>` and fatal for a
+WebGL texture, so the textures go through a host-allowlisted proxy. The 2D
+viewer hotlinks directly, because it is a real `<img>` and does not care.
+
+Each slide also has an **error boundary**. A loader error is thrown rather than
+suspended, so `<Suspense>` does not catch it and one dead URL took down the
+whole canvas.
+
+### The 42 skill badges are now the slowest thing on the loading screen
+
+Worth knowing before you optimise anything else. With the models compressed,
+a cold load looks like this:
+
+```
+portfolio_world.glb  352ms      71 files total
+monishwar.glb        305ms      slowest: xdc.png (940ms)
+tree.glb             341ms
+fountain.glb          83ms
+sofa.glb              50ms
+```
+
+The four models together are about 1.1 seconds. The *badges* are forty-two
+separate PNG requests, and on a cold connection the tail of them is slower
+than any model. They are small individually, which is exactly why nobody
+notices them in a size audit — the cost is in the request count, not the bytes.
+
+If this becomes the thing to fix, the answer is a sprite atlas: one texture
+with all forty-two marks on it and a UV offset per fruit, which turns 42
+requests into 1 and 42 materials into 1. That is a real change to `SkillFruit`
+— each fruit currently wraps its own texture, which is what lets a logo face
+you from any side — so it is not a free win, and it is not worth doing until
+the loading screen says it is.
+
+### The project gallery
+
+Only the focused bay's iframe is mounted, and only while you are standing at
+the stage in explore mode. Both halves matter:
+
+- six iframes is six web applications, one of which is itself a 3D cube
+- `Html` is a DOM layer over the canvas and **does not occlude**, so during the
+  intro — camera outside the ship — an ungated iframe drew itself over the hull
+  as a white rectangle floating in space
+
+---
+
 ## The kiosk on the deck
 
 `world/props/ControlBoard.tsx` — the permanent reference, for anyone who

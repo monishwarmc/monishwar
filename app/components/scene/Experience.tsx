@@ -34,6 +34,12 @@ const Experience = () => {
       // can lower this further from the settings panel.
       dpr={[1, QUALITY_PIXEL_RATIO[quality]]}
       gl={{ antialias: true, powerPreference: "high-performance" }}
+      // The certificate wall crops its slides to the cut-out with clipping
+      // planes on their materials, and three.js ignores those unless local
+      // clipping is switched on for the renderer.
+      onCreated={({ gl }) => {
+        gl.localClippingEnabled = true;
+      }}
     >
       {/*
         Declared rather than configured through `Canvas camera={...}` so the
@@ -48,7 +54,6 @@ const Experience = () => {
       <Suspense fallback={null}>
         <Environment files="/textures/space.hdr" background={showBackground} />
         <Light />
-        <Camera />
 
         {/*
           Nothing in this scene is dynamic — the only body that moves is the
@@ -76,6 +81,9 @@ const Experience = () => {
           debug
         >
           <WorldColliders />
+          {/* Inside Physics so the follow camera can ask it what is in the
+              way before it pulls back into a wall. */}
+          <Camera />
           <World />
           <CharacterController />
         </Physics>

@@ -9,6 +9,7 @@ import { useMemo } from "react";
 import {
   AVATAR_BODY,
   BOARD,
+  CERTS_STATION,
   BOARD_FACING,
   BOARD_POSITION,
   DECK,
@@ -18,6 +19,7 @@ import {
   SOFA_FACING,
   SOFA_HALF_WIDTH,
   SOFA_POSITION,
+  TREE_STATION,
 } from "@/app/constants/world.constants";
 
 /**
@@ -46,6 +48,19 @@ import {
  * physics at all, and nothing has to be converted either way.
  *
  * ## Shapes
+ *
+ * ## Every collider here carries an explicit `key`
+ *
+ * @react-three/rapier builds its effect dependencies as
+ * `[...mutablePropsAsFlatArray, getCollider]` — a *flattened* list of whatever
+ * props you passed. Two colliders of the same type therefore end up with deps
+ * arrays of different lengths if one takes a `rotation` and the other does not.
+ *
+ * Add a collider to the middle of an unkeyed list and React matches it
+ * positionally against whatever used to be in that slot, reuses its hooks, and
+ * the deps array changes size between renders — which React refuses, with an
+ * error pointing at the new collider rather than at the pair that collided.
+ * Keys make the matching explicit and retire the whole class of problem.
  *
  * Primitives throughout, no trimeshes. Every solid thing here is either a
  * column or a box, and the one piece of real geometry — the grass — is a flat
@@ -112,6 +127,7 @@ const WorldColliders = () => {
     <RigidBody type="fixed" colliders={false}>
       {/* The grass. A cylinder whose top face is the walking surface. */}
       <CylinderCollider
+        key="solid-1"
         args={[FLOOR_THICKNESS / 2, DECK.radius]}
         position={[0, DECK.surfaceY - FLOOR_THICKNESS / 2, 0]}
       />
@@ -127,10 +143,12 @@ const WorldColliders = () => {
 
       {/* The fountain basin, at the centre of the deck. */}
       <CylinderCollider
+        key="solid-2"
         args={[AVATAR_BODY.height / 8, FOUNTAIN.collision]}
         position={[0, GROUND_Y + AVATAR_BODY.height / 8, 0]}
       />
       <CylinderCollider
+        key="solid-3"
         args={[AVATAR_BODY.height / 8, 0.06]}
         position={[0, GROUND_Y + AVATAR_BODY.height / 1.9, 0]}
       />
@@ -140,6 +158,7 @@ const WorldColliders = () => {
         height of the sign so nobody jumps onto the panel and stands on it.
       */}
       <CuboidCollider
+        key="solid-4"
         args={[
           metres(BOARD.footing.width / 2),
           metres(BOARD.totalHeight / 2),
@@ -154,12 +173,43 @@ const WorldColliders = () => {
       />
 
       {/*
+        The certificate wall. A slab, so it is solid across its whole frontage
+        rather than only at the middle — you should be able to walk along it.
+      */}
+      <CuboidCollider
+        key="solid-5"
+        args={[metres(6.5), metres(4), metres(0.6)]}
+        position={[
+          CERTS_STATION.position[0],
+          GROUND_Y + metres(4),
+          CERTS_STATION.position[2],
+        ]}
+        rotation={[0, CERTS_STATION.facing, 0]}
+      />
+
+      {/*
+        The tree trunk. Only the trunk — the canopy is eight metres across and
+        starts well above head height, so a collider that matched the model
+        would be a wall around a tree you are meant to walk under.
+      */}
+      <CylinderCollider
+        key="solid-6"
+        args={[AVATAR_BODY.height, metres(1.5)]}
+        position={[
+          TREE_STATION.position[0],
+          GROUND_Y + AVATAR_BODY.height,
+          TREE_STATION.position[2],
+        ]}
+      />
+
+      {/*
         The sofa. Still a column rather than a box, and still at 80% of the
         sofa's width — the seat the avatar has to reach is only just in front
         of the cushion, and a collider on the true footprint would hold it
         back from the one spot it needs to stand on to sit down.
       */}
       <CylinderCollider
+        key="solid-7"
         args={[AVATAR_BODY.height / 6, SOFA_HALF_WIDTH * 0.8]}
         position={[
           SOFA_POSITION[0],
