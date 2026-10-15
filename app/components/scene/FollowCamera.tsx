@@ -32,6 +32,10 @@ const scratch = {
 /** Movement past this many pixels counts as a drag, not a tap. */
 const DRAG_THRESHOLD = 8;
 
+/** DOM surfaces that own their own clicks, scrolling, or gestures. */
+const CAMERA_EXCLUDED_SURFACES =
+  "button, a, input, select, textarea, [role=button], [data-scrollable], [data-scrolls], [data-project-screen], .stage-screen, .ui-panel, iframe";
+
 /** Frame-rate independent exponential smoothing. */
 const damp = (lambda: number, delta: number) => 1 - Math.exp(-lambda * delta);
 
@@ -52,7 +56,6 @@ const damp = (lambda: number, delta: number) => 1 - Math.exp(-lambda * delta);
 const FollowCamera = () => {
   const { ref } = useMonishwar();
   const camera = useThree((state) => state.camera);
-  const domElement = useThree((state) => state.gl.domElement);
   const settings = useSettings();
   const clearance = useCameraClearance();
 
@@ -87,16 +90,23 @@ const FollowCamera = () => {
       travelled = 0;
       inputState.dragged = false;
 
-      try {
-        domElement.setPointerCapture(event.pointerId);
-      } catch {
-        // Capture can be refused mid-gesture; looking still works without it.
-      }
+      // No pointer capture: the listeners are on the window, which already
+      // sees the whole gesture wherever it travels.
     };
 
     const onPointerMove = (event: PointerEvent) => {
       const previous = active.get(event.pointerId);
       if (!previous) return;
+
+      // A drag that started on the world can cross onto the live project
+      // browser. End the camera gesture there so the screen stays still while
+      // somebody is reading or interacting with it.
+      const surface = document.elementFromPoint(event.clientX, event.clientY);
+      if (surface?.closest(CAMERA_EXCLUDED_SURFACES)) {
+        active.delete(event.pointerId);
+        if (active.size < 2) pinch = null;
+        return;
+      }
 
       const dx = event.clientX - previous.x;
       const dy = event.clientY - previous.y;
@@ -126,31 +136,53 @@ const FollowCamera = () => {
     const onPointerUp = (event: PointerEvent) => {
       active.delete(event.pointerId);
       if (active.size < 2) pinch = null;
-
-      if (domElement.hasPointerCapture(event.pointerId)) {
-        domElement.releasePointerCapture(event.pointerId);
-      }
     };
 
     const onWheel = (event: WheelEvent) => {
+      // Scroll belongs to the surface under the pointer. In particular, the
+      // embedded project runs in its own browsing context; zooming the camera
+      // while someone reads that page makes the preview feel broken.
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest(CAMERA_EXCLUDED_SURFACES)
+      ) {
+        return;
+      }
+
       event.preventDefault();
       addZoom(event.deltaY * 0.0006);
     };
 
-    domElement.addEventListener("pointerdown", onPointerDown);
-    domElement.addEventListener("pointermove", onPointerMove);
-    domElement.addEventListener("pointerup", onPointerUp);
-    domElement.addEventListener("pointercancel", onPointerUp);
-    domElement.addEventListener("wheel", onWheel, { passive: false });
+    // The world and Drei's HTML screens share the viewport. Listen at the
+    // window so a drag can orbit over either one, then leave controls and
+    // scrollable surfaces to their own pointer handlers.
+    const onWindowDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+
+      if (
+        target?.closest(CAMERA_EXCLUDED_SURFACES)
+      ) {
+        return;
+      }
+
+      onPointerDown(event);
+    };
+
+    window.addEventListener("pointerdown", onWindowDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    window.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
-      domElement.removeEventListener("pointerdown", onPointerDown);
-      domElement.removeEventListener("pointermove", onPointerMove);
-      domElement.removeEventListener("pointerup", onPointerUp);
-      domElement.removeEventListener("pointercancel", onPointerUp);
-      domElement.removeEventListener("wheel", onWheel);
+      window.removeEventListener("pointerdown", onWindowDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      window.removeEventListener("wheel", onWheel);
     };
-  }, [domElement]);
+  }, []);
 
   /* -------------------------------------------------------- frame loop */
 

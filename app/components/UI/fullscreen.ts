@@ -27,11 +27,8 @@ export const isFullscreenSupported = () =>
     (document.documentElement as FullscreenElement).webkitRequestFullscreen
   );
 
-/**
- * Going fullscreen also pins the phone to landscape, which is the only way the
- * stick-and-buttons layout has room to breathe. The lock is best effort: iOS
- * Safari exposes neither the Fullscreen API on iPhone nor
- * `ScreenOrientation.lock`, so there the rotate prompt asks the player instead.
+/** Requests fullscreen and landscape on supported touch browsers. Both are
+ * best effort; the touch layout remains usable in portrait when either fails.
  */
 export const enterFullscreen = async () => {
   const element = document.documentElement as FullscreenElement;

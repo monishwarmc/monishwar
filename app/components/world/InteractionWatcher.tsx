@@ -12,6 +12,7 @@ import {
   allInteractables,
   getInteractionState,
   resetInteractions,
+  setInRange,
   setNearest,
   toggleNearest,
 } from "./interactables";
@@ -63,6 +64,7 @@ const InteractionWatcher = () => {
 
     let bestId: string | null = null;
     let bestDistance = Infinity;
+    const within: string[] = [];
 
     for (const item of allInteractables().values()) {
       item.object.getWorldPosition(scratch.prop);
@@ -72,11 +74,17 @@ const InteractionWatcher = () => {
         scratch.player.z - scratch.prop.z,
       );
 
-      if (distance < item.radius && distance < bestDistance) {
+      if (distance >= item.radius) continue;
+
+      within.push(item.id);
+
+      if (distance < bestDistance) {
         bestDistance = distance;
         bestId = item.id;
       }
     }
+
+    setInRange(within);
 
     const { nearest, engaged } = getInteractionState();
 

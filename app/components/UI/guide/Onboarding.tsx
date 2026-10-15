@@ -450,13 +450,10 @@ const Onboarding = () => {
         {step.demo}
       </GestureStage>
 
-      {/* Anchored left rather than centred: the top-right corner is the HUD's
-          own rail, and a centred card lands on top of it on a phone. The width
-          gives that rail 22rem of room before the card starts shrinking, and
-          stops shrinking at 15rem — narrower than that is a portrait phone,
-          which RotateHint has already covered with its own screen. */}
+      {/* Keep the lesson below the top HUD rail. On a phone the card can use
+          almost the full width without covering the status controls. */}
       <div
-        className="pointer-events-auto absolute left-[max(0.75rem,env(safe-area-inset-left))] top-[max(0.75rem,env(safe-area-inset-top))] w-[max(15rem,min(21rem,calc(100vw-22rem)))] rounded-2xl border border-white/15 bg-black/75 p-4 backdrop-blur-md"
+        className="ui-panel pointer-events-auto absolute left-[max(0.75rem,env(safe-area-inset-left))] top-[max(4.25rem,calc(env(safe-area-inset-top)+4rem))] w-[min(21rem,calc(100vw-1.5rem))] rounded-2xl border p-4 backdrop-blur-md"
         style={{ animation: "fadeIn 0.3s ease-out" }}
       >
         <div className="flex items-start gap-3">

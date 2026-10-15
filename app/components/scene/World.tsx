@@ -9,10 +9,12 @@ import { Fountain } from "../models/Fountain";
 import { useSession } from "../contexts/SessionContext";
 import GrassField from "../world/GrassField";
 import InteractionWatcher from "../world/InteractionWatcher";
+import AboutHologram from "../world/props/AboutHologram";
+import CertificateScreen from "../world/props/CertificateScreen";
+import ConventionStage from "../world/props/ConventionStage";
+import ContactUplink from "../world/props/ContactUplink";
 import ControlBoard from "../world/props/ControlBoard";
-import CertificateWall from "../world/props/CertificateWall";
-import ProfileStation from "../world/props/ProfileStation";
-import ProjectStage from "../world/props/ProjectStage";
+import TimePortal from "../world/props/TimePortal";
 import SkillTree from "../world/props/SkillTree";
 import SofaSpot from "../world/props/SofaSpot";
 
@@ -65,10 +67,16 @@ const World = () => {
       {/* Props. Add new ones here — see world/useInteractable.ts. */}
       <ControlBoard />
       <SofaSpot />
+
+      {/* The six exhibits, clockwise from the spawn. Where each one stands
+          is in STATIONS in world.constants — check `pnpm layout` if you move
+          one. */}
+      <AboutHologram />
+      <ConventionStage />
+      <CertificateScreen />
       <SkillTree />
-      <CertificateWall />
-      <ProjectStage />
-      <ProfileStation />
+      <TimePortal />
+      <ContactUplink />
 
       <Monishwar />
       <InteractionWatcher />

@@ -5,6 +5,7 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { MOVEMENT } from "@/app/constants/controls.constants";
 import { useMonishwar } from "../contexts/MonishwarContext";
+import { isPaved } from "@/app/constants/world.constants";
 import { makeRandom } from "./random";
 import { useSettings } from "../settings/settings";
 import { RING_RADIUS, SCALE } from "@/app/constants/world.constants";
@@ -228,6 +229,14 @@ const GrassField = () => {
 
       if (Math.hypot(cx, cz) < FOUNTAIN_CLEAR) continue;
 
+      // Nothing grows through a floor. See `isPaved` in world.constants.
+      //
+      // The tuft centre is checked here and each blade again below, because a
+      // tuft spreads about a quarter of a metre: skipping on the centre alone
+      // left a fringe of blades standing on the edge of the stage, which is
+      // the one place anybody would be looking at the boards closely.
+      if (isPaved(cx, cz)) continue;
+
       // Wear a path down the walkways out to each station.
       const toRing = Math.abs(radius - RING_RADIUS);
       if (toRing < 0.05 && random() < 0.65) continue;
@@ -236,11 +245,12 @@ const GrassField = () => {
         const spread = Math.sqrt(random()) * TUFT_SPREAD;
         const around = random() * Math.PI * 2;
 
-        dummy.position.set(
-          cx + Math.sin(around) * spread,
-          0.0295,
-          cz + Math.cos(around) * spread,
-        );
+        const bx = cx + Math.sin(around) * spread;
+        const bz = cz + Math.cos(around) * spread;
+
+        if (isPaved(bx, bz)) continue;
+
+        dummy.position.set(bx, 0.0295, bz);
         // Lean outwards from the centre of the tuft, like a real clump.
         dummy.rotation.set(
           (random() - 0.5) * 0.35,

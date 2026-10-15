@@ -21,9 +21,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * Pinch-zoom and the iOS rubber band both fight the on-screen controls, so the
- * viewport is locked. `viewportFit: cover` lets the HUD reach under the notch,
- * which the safe-area insets in the HUD then respect.
+ * The scene handles camera pinch-zoom itself. `viewportFit: cover` lets the
+ * HUD reach under the notch, which its safe-area insets then respect.
  */
 export const viewport: Viewport = {
   width: "device-width",

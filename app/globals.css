@@ -37,7 +37,7 @@ button {
   touch-action: none;
 }
 
-/* The settings panel is the one place that scrolls. */
+/* Marked DOM panels keep native scroll and touch gestures off the canvas. */
 input[type="range"],
 [data-scrollable] {
   touch-action: auto;
@@ -50,6 +50,29 @@ input[type="range"],
 
 * {
   scrollbar-width: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+iframe:focus-visible {
+  outline: 2px solid rgb(94 234 212 / 0.95);
+  outline-offset: 3px;
+}
+
+.ui-panel {
+  border-color: rgb(94 234 212 / 0.2);
+  background-color: rgb(4 12 18 / 0.94);
+  background-image:
+    radial-gradient(ellipse at 85% 0%, rgb(56 189 248 / 0.12), transparent 42%),
+    linear-gradient(145deg, rgb(11 25 33 / 0.96), rgb(4 9 14 / 0.96));
+  box-shadow:
+    0 24px 80px rgb(0 0 0 / 0.5),
+    inset 0 1px 0 rgb(255 255 255 / 0.07);
+}
+
+.project-preview-frame {
+  overscroll-behavior: contain;
+  touch-action: auto;
 }
 
 @keyframes fadeIn {

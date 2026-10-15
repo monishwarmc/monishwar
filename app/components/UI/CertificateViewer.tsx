@@ -52,7 +52,7 @@ const CertificateViewer = () => {
 
   return (
     <div className="pointer-events-auto absolute inset-0 z-40 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-      <div className="relative flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-emerald-300/30 bg-[#06111b]/95 shadow-2xl">
+      <div className="ui-panel relative flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
         <header className="flex items-start gap-3 border-b border-white/10 p-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

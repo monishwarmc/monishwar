@@ -1,6 +1,7 @@
 "use client";
 
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useTexture } from "@react-three/drei";
+import { CERTIFICATIONS } from "@/app/constants/portfolio.constants";
 import { MODEL_URLS } from "@/app/constants/models.generated";
 import { installAssetLog } from "./assetLog";
 
@@ -45,7 +46,35 @@ export const MODELS = [
  * moment the module is imported, which is well before React has rendered the
  * loading screen, and the manifest came out missing every model as a result.
  */
+/**
+ * Every certificate image, through the CORS shim.
+ *
+ * The issuers serve these without `Access-Control-Allow-Origin`, which is
+ * fine for an `<img>` and fatal for a WebGL texture, so the textures go via
+ * `app/api/cert-image`. The 2D viewer hotlinks the originals directly and
+ * does not need this.
+ */
+export const CERT_TEXTURES = CERTIFICATIONS.map(({ img }) =>
+  img.startsWith("/") ? img : `/api/cert-image?url=${encodeURIComponent(img)}`,
+);
+
+/**
+ * Kick everything off.
+ *
+ * The log has to be installed *before* the first fetch or those files never
+ * appear in the manifest. That is why the preloads live here rather than as
+ * `useGLTF.preload(...)` at the bottom of each model file: those run the
+ * moment the module is imported, which is well before React has rendered the
+ * loading screen, and the manifest came out missing every model as a result.
+ *
+ * The certificates are preloaded for a different reason. They are remote, and
+ * several of the issuers are slow, so fetching them on approach meant walking
+ * up to the display and watching it fill in. Pulling them during the loading
+ * screen — where waiting is the whole contract — means the display is simply
+ * ready.
+ */
 export const startLoading = () => {
   installAssetLog();
   MODELS.forEach((url) => useGLTF.preload(url));
+  CERT_TEXTURES.forEach((url) => useTexture.preload(url));
 };

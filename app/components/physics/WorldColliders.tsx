@@ -7,9 +7,14 @@ import {
 } from "@react-three/rapier";
 import { useMemo } from "react";
 import {
+  ABOUT_STATION,
   AVATAR_BODY,
   BOARD,
   CERTS_STATION,
+  CONTACT_STATION,
+  PORTAL_RIG,
+  PORTAL_STATION,
+  PROJECTS_STATION,
   BOARD_FACING,
   BOARD_POSITION,
   DECK,
@@ -19,6 +24,9 @@ import {
   SOFA_FACING,
   SOFA_HALF_WIDTH,
   SOFA_POSITION,
+  CERTS_RIG,
+  STAGE_RIG,
+  STAGE_DECK,
   TREE_STATION,
 } from "@/app/constants/world.constants";
 
@@ -143,22 +151,15 @@ const WorldColliders = () => {
 
       {/* The fountain basin, at the centre of the deck. */}
       <CylinderCollider
-        key="solid-2"
+        key="fountain"
         args={[AVATAR_BODY.height / 8, FOUNTAIN.collision]}
         position={[0, GROUND_Y + AVATAR_BODY.height / 8, 0]}
       />
-      <CylinderCollider
-        key="solid-3"
-        args={[AVATAR_BODY.height / 8, 0.06]}
-        position={[0, GROUND_Y + AVATAR_BODY.height / 1.9, 0]}
-      />
 
-      {/*
-        The control board. A box on the footing's footprint, run up the full
-        height of the sign so nobody jumps onto the panel and stands on it.
-      */}
+      {/* The control board. A box on the footing's footprint, run up the full
+          height of the sign so nobody jumps onto the panel and stands on it. */}
       <CuboidCollider
-        key="solid-4"
+        key="board"
         args={[
           metres(BOARD.footing.width / 2),
           metres(BOARD.totalHeight / 2),
@@ -173,27 +174,12 @@ const WorldColliders = () => {
       />
 
       {/*
-        The certificate wall. A slab, so it is solid across its whole frontage
-        rather than only at the middle — you should be able to walk along it.
-      */}
-      <CuboidCollider
-        key="solid-5"
-        args={[metres(6.5), metres(4), metres(0.6)]}
-        position={[
-          CERTS_STATION.position[0],
-          GROUND_Y + metres(4),
-          CERTS_STATION.position[2],
-        ]}
-        rotation={[0, CERTS_STATION.facing, 0]}
-      />
-
-      {/*
-        The tree trunk. Only the trunk — the canopy is eight metres across and
-        starts well above head height, so a collider that matched the model
+        The tree trunk. Only the trunk — the canopy is sixteen metres across
+        and starts well above head height, so a collider matching the model
         would be a wall around a tree you are meant to walk under.
       */}
       <CylinderCollider
-        key="solid-6"
+        key="tree"
         args={[AVATAR_BODY.height, metres(1.5)]}
         position={[
           TREE_STATION.position[0],
@@ -203,13 +189,154 @@ const WorldColliders = () => {
       />
 
       {/*
-        The sofa. Still a column rather than a box, and still at 80% of the
-        sofa's width — the seat the avatar has to reach is only just in front
-        of the cushion, and a collider on the true footprint would hold it
-        back from the one spot it needs to stand on to sit down.
+        THE STAGE RISER — the one collider here you are meant to stand on.
+
+        A box whose top face is the stage deck. It is deliberately low: the
+        avatar's jump tops out around a third of its own height, so a taller
+        riser would be scenery rather than somewhere to climb. Rapier's
+        autostep carries it up without a jump if it walks straight at the
+        steps, which is what the steps are for.
+      */}
+      <CuboidCollider
+        key="stage"
+        args={[
+          metres(STAGE_DECK.halfWidth),
+          metres(STAGE_DECK.height / 2),
+          metres(STAGE_DECK.halfDepth),
+        ]}
+        position={[
+          PROJECTS_STATION.position[0],
+          GROUND_Y + metres(STAGE_DECK.height / 2),
+          PROJECTS_STATION.position[2],
+        ]}
+        rotation={[0, PROJECTS_STATION.facing, 0]}
+      />
+
+      {/*
+        The steps up to the stage.
+
+        One wedge rather than three treads: the character controller's
+        autostep carries the avatar over anything under a third of its height,
+        so what it needs underfoot is a continuous ramp of collision, not
+        three separate lips to catch on. Without this the steps were decoration
+        and the only way onto the riser was a jump at its edge.
+      */}
+      <CuboidCollider
+        key="stage-steps"
+        args={[metres(3.75), metres(STAGE_DECK.height / 2), metres(1.1)]}
+        position={[
+          PROJECTS_STATION.position[0] +
+            Math.sin(PROJECTS_STATION.facing) *
+              metres(STAGE_DECK.halfDepth + 1),
+          GROUND_Y + metres(STAGE_DECK.height / 2),
+          PROJECTS_STATION.position[2] +
+            Math.cos(PROJECTS_STATION.facing) *
+              metres(STAGE_DECK.halfDepth + 1),
+        ]}
+        rotation={[0, PROJECTS_STATION.facing, 0]}
+      />
+
+      {/*
+        The LED wall. Solid, so nobody walks through the screen — and so the
+        camera cannot end up behind it looking at the back of the panel.
+      */}
+      <CuboidCollider
+        key="screen"
+        args={[
+          metres(STAGE_RIG.screen.width / 2),
+          metres(STAGE_RIG.screen.height / 2),
+          metres(0.5),
+        ]}
+        position={[
+          PROJECTS_STATION.position[0] -
+            Math.sin(PROJECTS_STATION.facing) *
+              metres(STAGE_RIG.riser.depth / 2 - 0.6),
+          GROUND_Y +
+            metres(
+              STAGE_DECK.height +
+                STAGE_RIG.screen.lift +
+                STAGE_RIG.screen.height / 2,
+            ),
+          PROJECTS_STATION.position[2] -
+            Math.cos(PROJECTS_STATION.facing) *
+              metres(STAGE_RIG.riser.depth / 2 - 0.6),
+        ]}
+        rotation={[0, PROJECTS_STATION.facing, 0]}
+      />
+
+      {/* The certificate cutout. Solid across its whole frontage, so you
+          walk round it rather than through it, and the camera cannot end up
+          behind the board. */}
+      {/* The two poles. Only the poles are solid — you should be able to
+          walk under the screen, which hangs well above head height. */}
+      {[-1, 1].map((side) => (
+        <CylinderCollider
+          key={`cert-pole-${side}`}
+          args={[AVATAR_BODY.height, metres(CERTS_RIG.pole.radius * 2.6)]}
+          position={[
+            CERTS_STATION.position[0] +
+              Math.cos(CERTS_STATION.facing) * side * metres(CERTS_RIG.screen.width * 0.56),
+            GROUND_Y + AVATAR_BODY.height,
+            CERTS_STATION.position[2] -
+              Math.sin(CERTS_STATION.facing) * side * metres(CERTS_RIG.screen.width * 0.56),
+          ]}
+        />
+      ))}
+
+      {/* The hologram's emitter pad. The light above it is not solid —
+          walking into a projection should not stop you. */}
+      <CylinderCollider
+        key="hologram"
+        args={[metres(0.3), metres(3.4)]}
+        position={[
+          ABOUT_STATION.position[0],
+          GROUND_Y + metres(0.3),
+          ABOUT_STATION.position[2],
+        ]}
+      />
+
+      {/* The two raised career cards and their narrow supports. */}
+      {[-1, 1].map((side) => (
+        <CuboidCollider
+          key={`portal-${side}`}
+          args={[
+            metres(PORTAL_RIG.panel.width / 2),
+            metres((PORTAL_RIG.panel.height + PORTAL_RIG.panel.support) / 2),
+            metres(0.2),
+          ]}
+          position={[
+            PORTAL_STATION.position[0] +
+              Math.cos(PORTAL_STATION.facing) * side * metres(PORTAL_RIG.sideOffset) +
+              Math.sin(PORTAL_STATION.facing) * metres(PORTAL_RIG.forwardOffset),
+            GROUND_Y +
+              metres((PORTAL_RIG.panel.height + PORTAL_RIG.panel.support) / 2),
+            PORTAL_STATION.position[2] -
+              Math.sin(PORTAL_STATION.facing) * side * metres(PORTAL_RIG.sideOffset) +
+              Math.cos(PORTAL_STATION.facing) * metres(PORTAL_RIG.forwardOffset),
+          ]}
+          rotation={[0, PORTAL_STATION.facing, 0]}
+        />
+      ))}
+
+      {/* The contact desk's base; its signal rings stay clear overhead. */}
+      <CylinderCollider
+        key="uplink"
+        args={[AVATAR_BODY.height, metres(1.9)]}
+        position={[
+          CONTACT_STATION.position[0],
+          GROUND_Y + AVATAR_BODY.height,
+          CONTACT_STATION.position[2],
+        ]}
+      />
+
+      {/*
+        The sofa. A column rather than a box, and at 80% of the sofa's width —
+        the seat the avatar has to reach is only just in front of the cushion,
+        and a collider on the true footprint would hold it back from the one
+        spot it needs to stand on to sit down.
       */}
       <CylinderCollider
-        key="solid-7"
+        key="sofa"
         args={[AVATAR_BODY.height / 6, SOFA_HALF_WIDTH * 0.8]}
         position={[
           SOFA_POSITION[0],
@@ -218,6 +345,7 @@ const WorldColliders = () => {
         ]}
         rotation={[0, SOFA_FACING, 0]}
       />
+
     </RigidBody>
   );
 };

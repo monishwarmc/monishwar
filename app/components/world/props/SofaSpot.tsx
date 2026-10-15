@@ -4,7 +4,6 @@ import { useCallback, useRef } from "react";
 import * as THREE from "three";
 import {
   AVATAR_SIT,
-  GROUND_Y,
   metres,
   SOFA_FACING,
   SOFA_POSITION,
@@ -41,10 +40,10 @@ const SofaSpot = () => {
     const object = group.current;
     if (!object) return false;
 
-    // The sitting clip keeps the avatar's root on the floor and raises the
-    // hips itself, so the seat is a spot on the ground, not the cushion.
+    // Keep the avatar root on the same raised deck as the sofa; the sitting
+    // clip raises the hips from there and settles them onto the cushion.
     const seat = object.localToWorld(SEAT_OFFSET.clone());
-    seat.y = GROUND_Y;
+    seat.y = SOFA_POSITION[1];
 
     playSfx("open", 0.5);
     return sitDown({ seat, facing: SOFA_FACING });
@@ -67,7 +66,7 @@ const SofaSpot = () => {
 
   return (
     <group
-      position={[SOFA_POSITION[0], GROUND_Y, SOFA_POSITION[2]]}
+      position={SOFA_POSITION}
       rotation={[0, SOFA_FACING, 0]}
       ref={group}
     >

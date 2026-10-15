@@ -21,6 +21,7 @@ import LoadingScreen, { useSceneReady } from "./LoadingScreen";
 import RotateHint from "./RotateHint";
 import SettingsPanel from "./SettingsPanel";
 import CertificateViewer from "./CertificateViewer";
+import SkillsPanel from "./SkillsPanel";
 import InteractPrompt from "./InteractPrompt";
 import {
   enterFullscreen,
@@ -55,10 +56,10 @@ const CornerButton = ({
         onPress();
       }}
       style={{ opacity: hudOpacity }}
-      className={`pointer-events-auto flex h-11 w-11 shrink-0 touch-none items-center justify-center rounded-full border backdrop-blur-sm transition-transform duration-200 hover:scale-105 active:scale-90 ${
+      className={`pointer-events-auto flex h-10 w-10 shrink-0 touch-none items-center justify-center rounded-2xl border shadow-lg backdrop-blur-md transition duration-200 hover:-translate-y-0.5 active:scale-90 ${
         active
-          ? "border-emerald-300/80 bg-emerald-400/30 text-emerald-50"
-          : "border-white/40 bg-black/35 text-white"
+          ? "border-emerald-200/70 bg-emerald-300/20 text-emerald-50 shadow-emerald-300/10"
+          : "border-white/15 bg-[#07131d]/75 text-white/85 hover:border-emerald-200/40 hover:text-white"
       }`}
     >
       {children}
@@ -83,7 +84,7 @@ const VolumeButton = () => {
   const silent = muted || masterVolume <= 0;
 
   return (
-    <span className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/40 bg-black/35 px-1 py-1 backdrop-blur-sm">
+    <span className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/15 bg-[#07131d]/75 px-1 py-1 shadow-lg backdrop-blur-md">
       <button
         type="button"
         aria-label="Volume down"
@@ -217,6 +218,7 @@ const Hud = () => {
           <Compass />
           <InteractPrompt />
           <CertificateViewer />
+          <SkillsPanel />
           <RotateHint />
         </>
       )}

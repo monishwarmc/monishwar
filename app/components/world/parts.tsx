@@ -50,6 +50,8 @@ export const HoloText = ({
   width?: number;
   onTop?: boolean;
   position?: [number, number, number];
+  /** For text that does not face the reader — lying on the ground, say. */
+  rotation?: [number, number, number];
   anchorX?: "left" | "center" | "right";
   anchorY?: "top" | "middle" | "bottom";
 }) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { Billboard, Text, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -61,6 +61,17 @@ const FRUIT_RADIUS = 0.25;
 const STEM = 0.45;
 /** No two fruit on a branch come closer than this. */
 const FRUIT_GAP = 1.05;
+
+/**
+ * Where the tree's own name is written on it, in metres.
+ *
+ * `TRUNK_RADIUS` is how far out the lettering sits from the centre line. The
+ * trunk is not a cylinder — it is a gnarled model that flares at the roots —
+ * so this is the radius at sign height rather than anything measured at the
+ * base, and it is set to stand the glyphs just clear of the bark.
+ */
+const TRUNK_SIGN_HEIGHT = 4.6;
+const TRUNK_RADIUS = 1.35;
 
 /** How far the rustle carries at full volume, in world units. */
 const RUSTLE_RANGE = 0.3;
@@ -292,6 +303,7 @@ const SkillTree = () => {
             branch,
             points: [] as THREE.Vector3[],
             sign: new THREE.Vector3(),
+            signTurn: new THREE.Euler(),
           };
         }
 
@@ -304,25 +316,61 @@ const SkillTree = () => {
           // every frame in two different places.
           .map((point) => point.setY(point.y - STEM));
 
-        // The branch wears its name about two thirds of the way out, sitting
-        // just above the wood — not floating off in the sky where it could
-        // belong to any branch at all.
-        // Near the end of the branch rather than the middle of it: close to
-        // the trunk every branch is in the same place, and five signs landed
-        // on top of each other. Out at the tips they have spread apart.
-        const along = toMetres(ranked[Math.floor(ranked.length * 0.12)].point);
+        /*
+         * The branch wears its name *on the wood*, running along the limb.
+         *
+         * It used to be a billboard floating in the air above the branch,
+         * which always read as a label belonging to the tree in general
+         * rather than to that branch in particular. Writing it along the limb
+         * — turned to lie on it, and tipped so it reads from out in the deck
+         * — makes the grouping obvious without a leader line.
+         *
+         * Two points along the branch give its direction: one out near the
+         * tip, one further in. The text is hung on the midpoint between them.
+         */
+        const tip = toMetres(ranked[Math.floor(ranked.length * 0.06)].point);
+        const inner = toMetres(ranked[Math.floor(ranked.length * 0.34)].point);
 
-        // Pushed clear of the leaves, and every other one lifted, so two
-        // branches that happen to end up side by side still read separately.
-        const outward = new THREE.Vector3(along.x, 0, along.z).normalize();
-        const sign = along
-          .addScaledVector(outward, 0.7)
-          .setY(along.y + 0.7 + (index % 2) * 0.85);
+        const run = new THREE.Vector3().subVectors(tip, inner);
+
+        // Radially outward from the trunk, flat — the side you read from.
+        const outward = new THREE.Vector3(run.x, 0, run.z);
+        if (outward.lengthSq() < 1e-6) outward.set(0, 0, 1);
+        outward.normalize();
+
+        // A basis with X along the limb, Z facing out of the canopy. Text is
+        // authored in its own XY plane looking down +Z, so these columns put
+        // the baseline on the branch and the face towards the reader.
+        const right = run.clone().projectOnPlane(outward);
+        if (right.lengthSq() < 1e-6) right.copy(new THREE.Vector3(1, 0, 0));
+        right.normalize();
+
+        const up = new THREE.Vector3().crossVectors(outward, right).normalize();
+
+        const signTurn = new THREE.Euler().setFromRotationMatrix(
+          new THREE.Matrix4().makeBasis(right, up, outward),
+        );
+
+        // On the midpoint, lifted just clear of the bark so the glyphs are
+        // not half-buried in it.
+        /*
+         * Sitting *on* the bark, not floating off it.
+         *
+         * It used to stand half a metre proud of the branch with a lift as
+         * well, which reads as a label pinned near the wood rather than a
+         * name cut into it. A few centimetres is enough to clear the surface
+         * without the glyphs z-fighting it.
+         */
+        const sign = new THREE.Vector3()
+          .addVectors(tip, inner)
+          .multiplyScalar(0.5)
+          .addScaledVector(outward, 0.09);
 
         return {
           branch,
           points: points.map(inWorld),
           sign: inWorld(sign),
+          signTurn,
         };
       }),
     [branches],
@@ -383,51 +431,41 @@ const SkillTree = () => {
         <FallingLeaves spread={TREE_MODEL.canopyRadius * TREE_FIT * 0.85} />
       </group>
 
-      {/* What the whole thing is. Billboarded, so it reads from anywhere on
-          the deck, and lit from within rather than relying on the scene's
-          lamps — the canopy above it is in deep shade. */}
-      <Billboard position={[0, metres(TREE_HEIGHT + 5.2), 0]}>
-        <Text
-          fontSize={metres(1.9)}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={metres(0.03)}
-          outlineColor="#06111b"
-          renderOrder={999}
-        >
+      {/*
+        The name, carved up the trunk.
+
+        It used to be a billboard five metres over the crown, which is where a
+        sign goes when nobody has decided what it belongs to. On the trunk it
+        belongs to the tree, and the tree is the one thing on the deck big
+        enough to carry its own title at this size.
+
+        Standing a little proud of the bark on the side facing the middle of
+        the deck — which is the direction everybody approaches from, and is
+        local +Z here because the tree is planted without a turn of its own.
+      */}
+      <group position={[0, metres(TRUNK_SIGN_HEIGHT), metres(TRUNK_RADIUS)]}>
+        {/* Cut into the trunk, same two passes as the branches. */}
+        <HoloText position={[0, 0, -metres(0.05)]} size={1.15} color="#14100b">
           SKILL TREE
-          <meshStandardMaterial
-            color="#eafff8"
-            emissive="#5eead4"
-            emissiveIntensity={2.2}
-            toneMapped={false}
-            depthTest={false}
-            depthWrite={false}
-            transparent
-          />
-        </Text>
+        </HoloText>
+        <HoloText size={1.15} color="#eafff8">
+          SKILL TREE
+        </HoloText>
 
-        <Text
-          position={[0, metres(-1.5), 0]}
-          fontSize={metres(0.5)}
-          anchorX="center"
-          anchorY="middle"
-          renderOrder={999}
+        <HoloText
+          position={[0, metres(-1.25), -metres(0.05)]}
+          size={0.44}
+          color="#14100b"
         >
-          walk up and press E, or point at a fruit
-          <meshStandardMaterial
-            color="#9fb6c9"
-            emissive="#38bdf8"
-            emissiveIntensity={0.9}
-            toneMapped={false}
-            depthTest={false}
-            depthWrite={false}
-            transparent
-          />
-        </Text>
-      </Billboard>
+          walk up and press E, or pick a fruit
+        </HoloText>
+        <HoloText position={[0, metres(-1.25), 0]} size={0.44} color="#9fb6c9">
+          walk up and press E, or pick a fruit
+        </HoloText>
+      </group>
 
-      {crops.map(({ branch, points, sign }) => (
+
+      {crops.map(({ branch, points, sign, signTurn }) => (
         <group key={branch.id}>
           {points.length > 0 && (
             <SkillFruit
@@ -454,12 +492,24 @@ const SkillTree = () => {
             </mesh>
           ))}
 
-          {/* The branch's name, pinned to the branch and turned to face you. */}
-          <Billboard position={[sign.x, sign.y, sign.z]}>
-            <HoloText size={0.78} color={branch.colour} onTop>
+          {/*
+            The branch's name, cut into the wood.
+
+            Two passes. A dark one dropped a little way into the bark is the
+            cut itself; the lit one just proud of it is the edge catching the
+            light. Together they read as carving rather than as text laid on
+            top — a single bright string on a dark branch always looks
+            printed, because nothing in a carving is brighter than its
+            surroundings all the way through.
+          */}
+          <group position={[sign.x, sign.y, sign.z]} rotation={signTurn}>
+            <HoloText position={[0, 0, -metres(0.04)]} size={0.82} color="#14100b">
               {branch.label}
             </HoloText>
-          </Billboard>
+            <HoloText size={0.82} color={branch.colour}>
+              {branch.label}
+            </HoloText>
+          </group>
         </group>
       ))}
     </group>

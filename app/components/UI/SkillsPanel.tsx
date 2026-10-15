@@ -2,9 +2,11 @@
 
 import CloseIcon from "@mui/icons-material/Close";
 import LaunchIcon from "@mui/icons-material/Launch";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import { press } from "../audio/sfx";
 import { useSettings } from "../settings/settings";
-import { SKILL_BRANCHES, SKILL_DOCS } from "../world/skills";
+import { destinationFor, SKILL_BRANCHES } from "../world/skills";
+import { openCertificate } from "../world/certificates";
 import { release, useInteractionState } from "../world/interactables";
 
 /**
@@ -36,12 +38,24 @@ const SkillsPanel = () => {
     release();
   };
 
+  /**
+   * Same destination the fruit gives: certificate first, documentation
+   * second. The list and the tree are two views of one thing, and a skill
+   * that proves itself with a certificate on the tree should not quietly
+   * send you to someone else's docs here.
+   */
   const open = (skill: string) => {
-    const docs = SKILL_DOCS[skill];
-    if (!docs) return;
+    const destination = destinationFor(skill);
+    if (!destination) return;
 
     press();
-    window.open(docs, "_blank", "noopener,noreferrer");
+
+    if (destination.kind === "certificate") {
+      openCertificate(destination.certificate.name);
+      return;
+    }
+
+    window.open(destination.url, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -52,7 +66,7 @@ const SkillsPanel = () => {
         if (event.target === event.currentTarget) close();
       }}
     >
-      <div className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0b0f14]">
+      <div className="ui-panel flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-2xl border">
         <header className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-white">Skill Tree</h2>
@@ -93,7 +107,10 @@ const SkillsPanel = () => {
 
               <div className="flex flex-wrap gap-2">
                 {branch.skills.map((skill) => {
-                  const docs = SKILL_DOCS[skill];
+                  // Where this skill leads, if anywhere — a certificate if it
+                  // earned one, otherwise the official documentation.
+                  const destination = destinationFor(skill);
+                  const docs = Boolean(destination);
 
                   return (
                     <button
@@ -108,7 +125,13 @@ const SkillsPanel = () => {
                       }`}
                     >
                       {skill}
-                      {docs && (
+                      {destination?.kind === "certificate" && (
+                        <VerifiedIcon
+                          style={{ fontSize: 13 }}
+                          className="text-emerald-300/80"
+                        />
+                      )}
+                      {destination?.kind === "docs" && (
                         <LaunchIcon style={{ fontSize: 12 }} className="opacity-50" />
                       )}
                     </button>

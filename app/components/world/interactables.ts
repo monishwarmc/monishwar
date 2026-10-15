@@ -55,10 +55,23 @@ type Snapshot = {
   nearest: string | null;
   /** The one currently being used (sitting on the sofa, reading a board). */
   engaged: string | null;
+  /**
+   * *Every* interactable in range, not just the winner.
+   *
+   * `nearest` is a competition, and some things need to know they are being
+   * stood at without having to win it. The keynote stage is the case that
+   * forced this: the sofa is parked in front of it deliberately, to watch the
+   * screen from — but sitting down made the sofa the nearest interactable, so
+   * the stage decided nobody was there and unmounted the site. You sat down
+   * to watch it and it switched off.
+   */
+  inRange: readonly string[];
 };
 
-let snapshot: Snapshot = { nearest: null, engaged: null };
-const SERVER: Snapshot = { nearest: null, engaged: null };
+const NONE: readonly string[] = [];
+
+let snapshot: Snapshot = { nearest: null, engaged: null, inRange: NONE };
+const SERVER: Snapshot = { nearest: null, engaged: null, inRange: NONE };
 
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((listener) => listener());
@@ -75,6 +88,22 @@ export const getInteractionState = () => snapshot;
 export const setNearest = (nearest: string | null) => {
   if (snapshot.nearest === nearest) return;
   snapshot = { ...snapshot, nearest };
+  notify();
+};
+
+/** Publishes who is in range. Order-insensitive, so it only wakes on change. */
+export const setInRange = (ids: readonly string[]) => {
+  const next = [...ids].sort();
+  const current = snapshot.inRange;
+
+  if (
+    next.length === current.length &&
+    next.every((id, i) => id === current[i])
+  ) {
+    return;
+  }
+
+  snapshot = { ...snapshot, inRange: next };
   notify();
 };
 
@@ -110,6 +139,7 @@ export const toggleNearest = () => {
 export const resetInteractions = () => {
   release();
   setNearest(null);
+  setInRange(NONE);
 };
 
 export const useInteractionState = () =>

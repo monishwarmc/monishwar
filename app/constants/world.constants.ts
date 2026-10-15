@@ -168,19 +168,6 @@ export const AVATAR_BODY = {
  * `FACING` turns each prop to look at the middle of the deck, which is where
  * people walk in from.
  */
-const facing = (position: readonly [number, number, number]) =>
-  Math.atan2(-position[0], -position[2]);
-
-/**
- * Off to one side of the spawn rather than in front of it, so the board is
- * something you notice and walk over to instead of something planted in your
- * view.
- */
-export const BOARD_POSITION = [-0.95, GROUND_Y, 0.25] as const;
-export const BOARD_FACING = facing(BOARD_POSITION);
-
-export const SOFA_POSITION = [0.4, GROUND_Y, 0.52] as const;
-export const SOFA_FACING = facing(SOFA_POSITION);
 
 /**
  * How much bigger the control board is than the size it was drawn at.
@@ -266,47 +253,234 @@ export const TREE_FIT = TREE_HEIGHT / (TREE_MODEL.crown - TREE_MODEL.ground);
 /**
  * WHERE EVERY BIG THING STANDS ON THE DECK.
  *
- * The deck is a disc of radius `DECK.radius` — about 25 metres across — and
- * these are the exhibits arranged around it. Keeping them in one list is what
- * makes it possible to see at a glance that nothing overlaps anything else,
- * which is not obvious from four separate component files.
+ * The deck is a disc of radius `DECK.radius` — about 25 metres across — with
+ * the fountain at the middle and six exhibits around it. Keeping them in one
+ * list is what makes it possible to see at a glance that nothing overlaps,
+ * which is not obvious from six separate component files.
  *
- * Positions are world units, as [x, z]. `facing` turns each one to look at the
- * middle of the deck, because that is where people walk in from.
+ * Laid out by **bearing**, like a compass rose, because that is how the
+ * arrangement is actually reasoned about: the visitor spawns at the south and
+ * turns to find things. 0 is +Z (south, behind the spawn mark), and bearings
+ * run clockwise.
  *
- * Clearances, so the next thing added here has something to check against:
- *
- *   fountain     centre, 0.09 radius
- *   tree         canopy reaches 0.55, so it cannot stand past 1.08 from centre
- *   control board 0.12 half-width, sofa 0.04
+ *            180  skill tree
+ *      122 certs           243  time portal
+ *       60 keynote stage   300  contact uplink
+ *          350  about hologram   330  controls kiosk
  *
  * Nothing may reach past `DECK.radius` (1.742) or it stands through the glass,
  * and ideally nothing past `DECK.walkRadius` (1.638) or you cannot get behind
- * it. The first arrangement of these four had three of them outside the dome
- * and two overlapping each other, which no screenshot made obvious — a wall
- * seen edge-on through a tree looks much like a wall.
- *
- * `scripts/check-layout.mjs` does the arithmetic. Run it after moving anything
- * here; it is faster and more reliable than walking the deck looking for it.
+ * it. `pnpm layout` does the arithmetic — run it after moving anything here.
+ * An earlier arrangement had three exhibits outside the dome and two inside
+ * each other, and no screenshot made that obvious.
  */
-const station = (x: number, z: number) => ({
-  position: [x, GROUND_Y, z] as [number, number, number],
-  facing: Math.atan2(-x, -z),
-  /** Distance from the middle of the deck, for the clearance notes above. */
-  reach: Math.hypot(x, z),
-});
+const station = (bearing: number, distance: number) => {
+  const angle = (bearing * Math.PI) / 180;
+  const x = Math.sin(angle) * distance;
+  const z = Math.cos(angle) * distance;
 
-/** The skill tree. Kept well inside the rim so the canopy clears the glass. */
-export const TREE_STATION = station(-0.55, -0.5);
+  return {
+    position: [x, GROUND_Y, z] as [number, number, number],
+    /** Turned to look at the middle of the deck, where people walk in from. */
+    facing: Math.atan2(-x, -z),
+    bearing,
+    distance,
+  };
+};
 
-/** The project gallery: a wide arc you walk along. */
-export const PROJECTS_STATION = station(1.05, 0.05);
+/** The skill tree. Pulled in from the rim so the canopy clears the glass. */
+export const TREE_STATION = station(180, 0.85);
 
-/** The certificate carousel. */
-export const CERTS_STATION = station(0.45, -1.1);
+/** The circus stage. The largest thing on the deck after the tree. */
+export const PROJECTS_STATION = station(60, 0.9);
 
-/** Experience, education, languages and contact. */
-export const PROFILE_STATION = station(-0.3, 1.0);
+/** The certificate mast. */
+export const CERTS_STATION = station(120, 1.1);
+
+/** The hologram that introduces him. */
+export const ABOUT_STATION = station(350, 1.22);
+
+/**
+ * The time portal: where he has worked and studied.
+ *
+ * Two career cards either side of a short, connected timeline. `PORTAL_SPAN`
+ * defines the floor marker; `PORTAL_RIG` carries each card's shared geometry
+ * into the visual, collision and layout code.
+ */
+export const PORTAL_SPAN = 10.4;
+
+/**
+ * The two career records sit on a shared timeline instead of separate arches.
+ * Kept here because their footprints and stand heights are shared with the
+ * physics colliders and layout check.
+ */
+export const PORTAL_RIG = {
+  panel: { width: 4.6, height: 5.8, depth: 0.16, support: 0.7 },
+  sideOffset: 2.8,
+  forwardOffset: 1.15,
+} as const;
+
+export const PORTAL_STATION = station(243, 1.2);
+
+/** The uplink: how to reach him. */
+export const CONTACT_STATION = station(295, 1.0);
+
+/** The controls kiosk, near the spawn mark but out of the sight line. */
+export const BOARD_POSITION = station(330, 0.78).position;
+export const BOARD_FACING = station(330, 0.78).facing;
+
+
+/**
+ * The circus ring you can climb onto, in metres.
+ *
+ * Shared because the stage draws it and `WorldColliders` makes it solid, and
+ * the two must agree to the millimetre or the avatar stands in mid-air or
+ * sinks into the boards.
+ *
+ * `height` is the number that matters. The avatar's jump reaches about a
+ * third of its own height — `jumpPower` 0.23 against `gravity` 0.71, so
+ * v²/2g — and the ring has to stay under that or it is scenery rather than
+ * somewhere to climb.
+ */
+export const STAGE_DECK = {
+  /** Half-extents of the riser, matching STAGE_RIG.riser. */
+  halfWidth: 8.5,
+  halfDepth: 5,
+  height: 0.42,
+} as const;
+
+/**
+ * The keynote stage's rig, in metres.
+ *
+ * The screen size here is load-bearing twice over: the panel is built from
+ * it, and the embedded page is scaled by `metres(width) / pixels`, which is
+ * what pins the DOM exactly onto the quad instead of letting it float in
+ * front at a size of its own.
+ */
+/**
+ * The certificate cutout, in metres.
+ *
+ * Deliberately enormous. A certificate is a dense document — small print,
+ * a seal, a signature — and at the banner scale this replaced, the only
+ * legible thing on it was the border. At this size the board *is* the
+ * certificate rather than a picture mounted on one.
+ */
+/**
+ * The certificate hoarding, in metres.
+ *
+ * Two poles with a screen slung between them. Sized against the *dome*, not
+ * just the floor: at 16 metres out the glass is only about 19.5 metres high,
+ * and the cutout this replaced stood 24 metres and went through the roof.
+ * `pnpm layout` checks both now.
+ */
+export const CERTS_RIG = {
+  pole: { height: 15, radius: 0.42 },
+  screen: { width: 11.4, height: 8 },
+  gantry: { span: 14 },
+} as const;
+
+export const STAGE_RIG = {
+  riser: { width: 17, depth: 10 },
+  screen: { width: 13.3, height: 7.6, lift: 1.3, bezel: 0.5 },
+  truss: { height: 12.4, span: 16 },
+} as const;
 
 /** Kept for the tree's own module, which was written against this name. */
 export const TREE_POSITION = TREE_STATION.position;
+
+
+/**
+ * The sofa, up on the stage itself.
+ *
+ * It sat on the grass in front of the riser and ended up half-buried in the
+ * steps — the one place on the deck where the ground is not flat. Putting it
+ * *on* the boards solves that and reads better anyway: seating on a stage,
+ * facing the screen, rather than furniture abandoned on a lawn.
+ *
+ * `y` is the deck height, so it stands on the riser rather than through it.
+ */
+export const SOFA_POSITION: [number, number, number] = [
+  station(60, 0.78).position[0],
+  GROUND_Y + metres(STAGE_DECK.height),
+  station(60, 0.78).position[2],
+];
+
+/** Turned to face the screen, which is further out along the same bearing. */
+export const SOFA_FACING = station(60, 0.78).facing + Math.PI;
+
+/* ------------------------------------------------------------- the paving */
+
+/**
+ * WHERE THE GRASS DOES NOT GROW.
+ *
+ * Anything with a floor — the stage riser, the uplink's apron, the hologram
+ * pad, the portal's walkway — stands on the deck rather than hovering over
+ * it, and grass is scattered across the whole deck. The blades are taller
+ * than the riser is high, so without this they grow straight up through the
+ * boards: the single most "not real" thing in the scene, because every other
+ * surface behaves.
+ *
+ * It lives here rather than in `GrassField` because these are the same
+ * footprints the colliders and the layout check are built from, and three
+ * copies of a station's size would drift apart the first time one changed.
+ */
+type Paving =
+  | { kind: "disc"; x: number; z: number; radius: number }
+  | {
+      kind: "slab";
+      x: number;
+      z: number;
+      facing: number;
+      halfWidth: number;
+      halfDepth: number;
+    };
+
+const PAVING: Paving[] = [
+  {
+    kind: "slab",
+    x: PROJECTS_STATION.position[0],
+    z: PROJECTS_STATION.position[2],
+    facing: PROJECTS_STATION.facing,
+    halfWidth: metres(STAGE_DECK.halfWidth),
+    halfDepth: metres(STAGE_DECK.halfDepth),
+  },
+  {
+    kind: "disc",
+    x: CONTACT_STATION.position[0],
+    z: CONTACT_STATION.position[2],
+    radius: metres(6),
+  },
+  {
+    kind: "disc",
+    x: ABOUT_STATION.position[0],
+    z: ABOUT_STATION.position[2],
+    radius: metres(3.4),
+  },
+  {
+    kind: "slab",
+    x: PORTAL_STATION.position[0],
+    z: PORTAL_STATION.position[2],
+    facing: PORTAL_STATION.facing,
+    halfWidth: metres(PORTAL_SPAN / 2),
+    halfDepth: metres(1.3),
+  },
+];
+
+/** True where a blade of grass would be standing on something built. */
+export const isPaved = (x: number, z: number) =>
+  PAVING.some((area) => {
+    if (area.kind === "disc") {
+      return Math.hypot(x - area.x, z - area.z) < area.radius;
+    }
+
+    // Into the slab's own frame, then a plain box test.
+    const dx = x - area.x;
+    const dz = z - area.z;
+    const cos = Math.cos(area.facing);
+    const sin = Math.sin(area.facing);
+
+    return (
+      Math.abs(dx * cos - dz * sin) < area.halfWidth &&
+      Math.abs(dx * sin + dz * cos) < area.halfDepth
+    );
+  });

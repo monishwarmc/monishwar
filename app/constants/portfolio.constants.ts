@@ -105,6 +105,13 @@ export const EDUCATION = [
   },
 ] as const;
 
+export const ABOUT_STORY = {
+  systems: `Mechanical engineering was my starting point; understanding how systems connect is still what I love. As an ${EXPERIENCE[0].role} at ${EXPERIENCE[0].company}, I work close to industrial operations and the constraints that shape real work. That experience keeps my approach practical: learn the problem, make the flow clear, and build something dependable around it.`,
+  products: `I build AI-powered full-stack products from first sketch through deployment. My work spans Python, FastAPI, React, Next.js, TypeScript, PostgreSQL and PyTorch. I’m exploring retrieval-augmented generation, computer vision, intelligent agents and interactive 3D—especially ways to make complex information easier to use. I enjoy turning a rough idea into a working product, then refining the details so each part belongs.`,
+} as const;
+
+export const ABOUT_FOCUS = "FULL-STACK · APPLIED AI · INTERACTIVE 3D";
+
 export const PROJECTS = [
   {
     name: "Health Copilot",

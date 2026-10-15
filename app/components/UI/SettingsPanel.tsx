@@ -170,7 +170,7 @@ const SettingsPanel = () => {
         if (event.target === event.currentTarget) close();
       }}
     >
-      <aside className="flex h-full w-full max-w-[26rem] flex-col border-l border-white/10 bg-[#0b0f14]/95 shadow-2xl sm:w-[26rem]">
+      <aside className="ui-panel flex h-full w-full max-w-[26rem] flex-col border-l border-white/10 shadow-2xl sm:w-[26rem]">
         <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div>
             <h2 className="text-base font-semibold text-white">Settings</h2>
@@ -205,7 +205,10 @@ const SettingsPanel = () => {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-8">
+        <div
+          data-scrollable
+          className="flex-1 overflow-y-auto overscroll-contain px-4 pb-8"
+        >
           {tab === "controls" && (
             <>
               <Section title="Look">
